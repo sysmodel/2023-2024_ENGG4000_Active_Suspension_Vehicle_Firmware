@@ -30,9 +30,11 @@
 
 //---------------------------------------------------------------------
 
+// Libraries
 #include "Timer_AGT_One.h"
 #include "HX711.h"
 
+// Pins
 #define sensV A1
 #define sensC A2  //current is analog signal via 100mV/A
 #define mdEn 3 //motor driver enable, PWM signal
@@ -40,29 +42,29 @@
 #define mdIn2 9 //low or high signal for direction, complements mdIn1
 #define led LED_BUILTIN
 
-int sensVVal=0;
-int sensCVal=0;
+int sensVVal = 0;
+int sensCVal = 0;
 volatile int cnt = 0;
+unsigned long scaledVolt;
+float realVolt = 0;
+float realAmp = 0;
+double currentSensorSensitivity = 66; // mv/A
+// LED control (for PWM state visualization)
 int in1State = LOW;
 int in2State = LOW;
 int ledState = LOW;
-unsigned long scaledVolt;
-float realVolt=0;
-int scaledAmp=0;
-float realAmp=0;
+// Strain gauge digital pins
 const int LOADCELL_DOUT_PIN = 5;
 const int LOADCELL_SCK_PIN = 6;
 long reading;
-double currentSensorSensitivity = 66; // mv/A
-
-//New Current sensing 
+// Current sensing
 unsigned int total; // holds <= 64 analogReads
 byte numReadings = 64;
 float offset = 512.1; // calibrate zero current
 float span = 0.066; // calibrate max current | ~0.07315 is for 30A sensor
 float current; // holds final current
 float rawData;
-
+// Object for strain gauge
 HX711 scale;
 
 //---------------------------------------------------------------------
@@ -84,6 +86,16 @@ void switchDirecTest(void) {
   digitalWrite(led, ledState);
 }
 
+void GetCurrentValue()
+{
+  total = 0; // reset
+  for (int i = 0; i < numReadings; i++) total += analogRead(A2);
+  current = (total / numReadings - offset) * span;
+  rawData = analogRead(A0);
+  // Serial.print(rawData);
+  Serial.println(current);  // in amps
+}
+
 //---------------------------------------------------------------------
 
 void setup() {
@@ -101,8 +113,6 @@ void setup() {
   // scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
 }
 
-
-
 void loop() {
   if (scale.is_ready()) {
     reading = scale.read();
@@ -116,33 +126,17 @@ void loop() {
   sensVVal = analogRead(sensV);
   sensCVal = analogRead(sensC);
   //realAmp = 1000*(5*(analogRead(sensC)/1023.0) - 2.5)/(currentSensorSensitivity/1000.0); // Convert the values to mA
-  //scaledVolt = map(sensVVal, 0, 1023, 0, 5000);
-  //realVolt = scaledVolt * 0.005;
-  // scaledAmp = map(sensCVal, 0, 1023, 0, 5000);
-  // realAmp = (scaledAmp / 66 - 2.5) * 1000;
-  GetCurrentValue();
+  scaledVolt = map(sensVVal, 0, 1023, 0, 5000);
+  realVolt = scaledVolt * 0.005;  // in volts
   
   // Print values here, then record using Realterm and process using Excel
   Serial.print(reading);
   Serial.print(",");
-  Serial.print(current);
+  Serial.print(realVolt);
   Serial.print(",");
-  Serial.println(sensCVal);
+  GetCurrentValue();
+  // Serial.println(realAmp);
   
   // Artificial delay so there isn't too much data
   delay(100);
 }
-
-void GetCurrentValue()
-{
-  total = 0; // reset
-  for (int i = 0; i < numReadings; i++) total += analogRead(A2);
-  current = (total / numReadings - offset) * span;
-  rawData = analogRead(A0);
-  Serial.print("Raw Data: ");
-  Serial.print(rawData);
-  Serial.print("Current is  ");
-  Serial.print(current);
-  Serial.println("  Amp");
-}
-
