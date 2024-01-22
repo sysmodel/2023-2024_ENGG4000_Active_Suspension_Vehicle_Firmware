@@ -132,16 +132,16 @@ void CCUpdatePWM() {
   digitalWrite(mdIn2, HIGH);
   if (setI > current) {
     deltaI = setI - current;
-    if (delta > 0.5) {
+    if (deltaI > 0.5) {
       pwm = pwm + 10;
-    } else if (delta > 0.1) {
+    } else if (deltaI > 0.1) {
       pwm = pwm + 5;
     }
   } else if (setI < current) {
     deltaI = current - setI;
-    if (delta > 0.5) {
+    if (deltaI > 0.5) {
       pwm = pwm - 10;
-    } else if (delta > 0.1) {
+    } else if (deltaI > 0.1) {
       pwm = pwm - 5;
     }
   }
