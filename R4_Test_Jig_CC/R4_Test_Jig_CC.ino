@@ -33,6 +33,7 @@ References:
 // Libraries
 #include "Timer_AGT_One.h"
 #include "HX711.h"
+// #include "PID.h"
 
 // Pins
 #define sensV A1
@@ -72,11 +73,16 @@ HX711 scale;
 // Current control
 int pwm = 25;
 int duty;
-int setT = 20; // in N*m
+int setT = 10; // 23 // in N*m
 double k_IT = 0.1282; // in A/(N*m)
 float setI;
 float deltaI;
 float torque; // in N*m
+// PID
+double setIPID, currentPID, pwmPID; // define PID variable
+double Kp=0.02, Ki=0, Kd=0;  // specify initial tuning parameters
+// PID myPID(&currentPID, &pwmPID, &setIPID, Kp, Ki, Kd, DIRECT);
+// void SetOutputLimits(0, 140);
 
 //---------------------------------------------------------------------
 
@@ -130,21 +136,24 @@ void ReadSensors() {
 void CCUpdatePWM() {
   digitalWrite(mdIn1, LOW);
   digitalWrite(mdIn2, HIGH);
-  if (setI > current) {
-    deltaI = setI - current;
-    if (deltaI > 0.5) {
-      pwm = pwm + 10;
-    } else if (deltaI > 0.1) {
-      pwm = pwm + 5;
-    }
-  } else if (setI < current) {
-    deltaI = current - setI;
-    if (deltaI > 0.5) {
-      pwm = pwm - 10;
-    } else if (deltaI > 0.1) {
-      pwm = pwm - 5;
-    }
-  }
+  // if (setI > current) {
+  //   deltaI = setI - current;
+  //   if (deltaI > 0.5) {
+  //     pwm = pwm + 10;
+  //   } else if (deltaI > 0.1) {
+  //     pwm = pwm + 5;
+  //   }
+  // } else if (setI < current) {
+  //   deltaI = current - setI;
+  //   if (deltaI > 0.5) {
+  //     pwm = pwm - 10;
+  //   } else if (deltaI > 0.1) {
+  //     pwm = pwm - 5;
+  //   }
+  // }
+  deltaI = setI - current;
+  pwm = pwm + deltaI*6;
+  if (pwm > 150) {pwm = 150;} else if (pwm < 0) {pwm = 0;} 
   analogWrite(mdEn, pwm);
 }
 
@@ -165,33 +174,48 @@ void setup() {
   digitalWrite(led, LOW);
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
   setI = setT * k_IT; // in A
+  // myPID.SetMode(AUTOMATIC);
   delay(1500);
 }
 
 void loop() {
 
-  // Read sensors and update PWM for current control accordingly
-  digitalWrite(led, HIGH);
-  ReadSensors();
-  CCUpdatePWM();
+  if (current < 15) {
 
-  // PWM duty cycle (0 to 100)
-  duty = pwm / 255 * 100;
+    // Read sensors and update PWM for current control accordingly
+    digitalWrite(led, HIGH);
+    ReadSensors();
+    currentPID = 100*current;
+    setIPID = 100*setI;
+    // myPID.Compute();
+    CCUpdatePWM();
 
-  // Torque, based on measured current
-  torque = current / k_IT;
-  
-  // Print values here, then record using Realterm and process using Excel
-  Serial.print(weight);     // in kg
-  Serial.print(",");
-  Serial.print(realVolt);   // in V
-  Serial.print(",");
-  Serial.print(current);    // in A
-  Serial.print(",");
-  Serial.print(torque);     // in N*m
-  Serial.print(",");
-  Serial.println(duty);     // in %
-  
-  // Artificial delay so there isn't too much data
-  delay(100);
+    // PWM duty cycle (0 to 100)
+    duty = pwm / 255 * 100;
+
+    // Torque, based on measured current
+    torque = current / k_IT;
+    
+    // Print values here, then record using Realterm and process using Excel
+    deltaI = setI - current;
+    Serial.print(deltaI);       // in A
+    Serial.print(",");
+    Serial.print(setI);       // in A
+    Serial.print(",");  
+    Serial.print(reading);     // in kg
+    Serial.print(",");
+    Serial.print(realVolt);   // in V
+    Serial.print(",");
+    Serial.print(current);    // in A
+    Serial.print(",");
+    // Serial.print(torque);     // in N*m
+    // Serial.print(",");
+    Serial.println(pwm);     // in %
+    
+    // Artificial delay so there isn't too much data
+    delay(200);
+  } else {
+    analogWrite(mdEn, 0);
+  }
+
 }
