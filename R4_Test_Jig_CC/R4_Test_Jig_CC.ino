@@ -2,10 +2,10 @@
 * Rack and Pinion Test Jig Firmware (w/ current control)
 *
 * Authors: Gregory Stewart, John Estafanos, Andrew Kennah, Patrick Laforest
-* Creation Date: Jan 6, 2024
-* Last Update: Jan 11, 2024
+* Creation Date: Jan 22, 2024
+* Last Update: Jan 25, 2024
 * Board: Uno R4 Minima
-* Version: 1
+* Version: 2
 *
 I/O:
 - force sensor: digital inputs
@@ -13,14 +13,16 @@ I/O:
 - voltage sensor: analog input
 - current sensor: analog input
 - direction: digital outputs
+- potentiometer: manual control of PWM or current setpoint
 
-Description: 
+Description:
 - This code is written to test the rack and pinion mechanism with a 390 motor driven back and forth. 
 - There are force (strain gauge), voltage and current sensors.
 
-Functions & Descriptions: 
-- switchDirecTest(): This function switches the rotational direction of the motor and the PWM (effective voltage) to the motor.
+Functions & Descriptions:
 - GetCurrentValue(): Runs code to read the current sensor and translate its output into amps.
+- ReadSensors(): Runs the current value acquisition function and also obtains the strain gauge value and the current.
+- CCUpdatePWM(): Uses a controller to output an appropriate correction to the PWM based on current value error.
 
 References:
 - Link: https://forum.arduino.cc/t/is-there-a-good-replacement-for-timerone/1182956/10
@@ -30,12 +32,14 @@ References:
 
 //---------------------------------------------------------------------
 
+
 // Libraries
 #include "Timer_AGT_One.h"
 #include "HX711.h"
-// #include "PID.h"
+#include <PID_v1.h>
 
 // Pins
+#define potPin A0
 #define sensV A1
 #define sensC A2  //current is analog signal via 100mV/A
 #define mdEn 3 //motor driver enable, PWM signal
@@ -43,6 +47,9 @@ References:
 #define mdIn2 9 //low or high signal for direction, complements mdIn1
 #define led LED_BUILTIN
 
+// Misc.
+char runMode = 'run'; // can be 'run' or 'stop' or 'poten'
+int potVal; // for potentiometer manual PWM control
 int sensVVal = 0;
 int sensCVal = 0;
 volatile int cnt = 0;
@@ -50,17 +57,22 @@ unsigned long scaledVolt;
 float realVolt = 0;
 float realAmp = 0;
 double currentSensorSensitivity = 66; // mv/A
+int pwmCeiling = 200;
+
 // LED control (for PWM state visualization)
 int in1State = LOW;
 int in2State = LOW;
 int ledState = LOW;
-// Strain gauge digital pins
+
+// Strain gauge pins and object
 const int LOADCELL_DOUT_PIN = 5;
 const int LOADCELL_SCK_PIN = 6;
 long reading;
 long lastReading;
 unsigned long dReading;
 float weight;
+HX711 scale;  // object for strain gauge
+
 // Current sensing
 unsigned int total; // holds <= 64 analogReads
 byte numReadings = 64;
@@ -68,40 +80,29 @@ float offset = 512.1; // calibrate zero current
 float span = 0.066; // calibrate max current | ~0.07315 is for 30A sensor
 float current; // holds final current, in A
 float rawData;
-// Object for strain gauge
-HX711 scale;
+
 // Current control
 int pwm = 25;
 int duty;
 int setT = 10; // 23 // in N*m
 double k_IT = 0.1282; // in A/(N*m)
-float setI;
+float setI = 2; // in A
 float deltaI;
 float torque; // in N*m
+
 // PID
-double setIPID, currentPID, pwmPID; // define PID variable
-double Kp=0.02, Ki=0, Kd=0;  // specify initial tuning parameters
-// PID myPID(&currentPID, &pwmPID, &setIPID, Kp, Ki, Kd, DIRECT);
-// void SetOutputLimits(0, 140);
+double setIPID, currentPID, outPID; // define PID variable
+double Kp=4, Ki=0.03, Kd=2;  // specify initial tuning parameters
+int errPWM;
+PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
+
+// Current sensor offset correction
+float currentOffset;  // in A
+
+
 
 //---------------------------------------------------------------------
 
-void switchDirecTest() {
-  if (cnt == 1){
-    digitalWrite(mdIn1, HIGH);
-    digitalWrite(mdIn2, LOW);
-    analogWrite(mdEn, 25);
-    ledState = HIGH;
-  } else if (cnt == 2) {
-    digitalWrite(mdIn1, LOW);
-    digitalWrite(mdIn2, HIGH);
-    analogWrite(mdEn, 100);
-    cnt = 0;
-    ledState = LOW;
-  }
-  cnt++;
-  digitalWrite(led, ledState);
-}
 
 void GetCurrentValue() {
   total = 0; // reset
@@ -110,7 +111,6 @@ void GetCurrentValue() {
 }
 
 void ReadSensors() {
-
   // Check strain gauge value & calculate weight
   if (scale.is_ready()) {
     lastReading = reading;
@@ -131,37 +131,43 @@ void ReadSensors() {
 
   // Check current sensor
   GetCurrentValue();
+
+  // Print values here, then record using Realterm and process using Excel
+  deltaI = setI - current;
+  Serial.print(deltaI);       // in A
+  Serial.print(",");
+  Serial.print(setI);       // in A
+  Serial.print(",");  
+  Serial.print(reading);     // in kg
+  Serial.print(",");
+  Serial.print(realVolt);   // in V
+  Serial.print(",");
+  Serial.print(current);    // in A
+  Serial.print(",");
+  Serial.println(pwm);     // 0-255
 }
 
 void CCUpdatePWM() {
-  digitalWrite(mdIn1, LOW);
-  digitalWrite(mdIn2, HIGH);
-  // if (setI > current) {
-  //   deltaI = setI - current;
-  //   if (deltaI > 0.5) {
-  //     pwm = pwm + 10;
-  //   } else if (deltaI > 0.1) {
-  //     pwm = pwm + 5;
-  //   }
-  // } else if (setI < current) {
-  //   deltaI = current - setI;
-  //   if (deltaI > 0.5) {
-  //     pwm = pwm - 10;
-  //   } else if (deltaI > 0.1) {
-  //     pwm = pwm - 5;
-  //   }
-  // }
-  deltaI = setI - current;
-  pwm = pwm + deltaI*6;
-  if (pwm > 150) {pwm = 150;} else if (pwm < 0) {pwm = 0;} 
+  // Current control (PID library)
+  currentPID = current;
+  setIPID = setI;
+  myPID.Compute();
+  pwm = int((double(pwm)*100.0 + outPID*100.0)) / 100;
+  if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
   analogWrite(mdEn, pwm);
+
+  // // Current control (not PID)
+  // deltaI = setI - current;
+  // pwm = pwm + deltaI*6;
+  // if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
+  // analogWrite(mdEn, pwm);
 }
 
 
 //---------------------------------------------------------------------
 
+
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(115200);
   pinMode(sensV, INPUT);
   pinMode(sensC, INPUT);
@@ -169,53 +175,34 @@ void setup() {
   pinMode(mdIn1, OUTPUT);
   pinMode(mdIn2, OUTPUT);
   pinMode(led, OUTPUT);
-  // Timer1.initialize(1500000);
-  // Timer1.attachInterrupt(switchDirecTest);
+  Timer1.initialize(200000);
+  Timer1.attachInterrupt(ReadSensors);
   digitalWrite(led, LOW);
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
-  setI = setT * k_IT; // in A
-  // myPID.SetMode(AUTOMATIC);
+  myPID.SetOutputLimits(0, pwmCeiling);
+  myPID.SetMode(AUTOMATIC);
   delay(1500);
+  digitalWrite(mdIn1, LOW);
+  digitalWrite(mdIn2, HIGH);
 }
 
 void loop() {
-
-  if (current < 15) {
-
-    // Read sensors and update PWM for current control accordingly
-    digitalWrite(led, HIGH);
-    ReadSensors();
-    currentPID = 100*current;
-    setIPID = 100*setI;
-    // myPID.Compute();
-    CCUpdatePWM();
-
-    // PWM duty cycle (0 to 100)
-    duty = pwm / 255 * 100;
-
-    // Torque, based on measured current
-    torque = current / k_IT;
-    
-    // Print values here, then record using Realterm and process using Excel
-    deltaI = setI - current;
-    Serial.print(deltaI);       // in A
-    Serial.print(",");
-    Serial.print(setI);       // in A
-    Serial.print(",");  
-    Serial.print(reading);     // in kg
-    Serial.print(",");
-    Serial.print(realVolt);   // in V
-    Serial.print(",");
-    Serial.print(current);    // in A
-    Serial.print(",");
-    // Serial.print(torque);     // in N*m
-    // Serial.print(",");
-    Serial.println(pwm);     // in %
-    
-    // Artificial delay so there isn't too much data
-    delay(200);
-  } else {
+  if(runMode == 'run') {
+    if (current < 15) {
+      // Read sensors and update PWM for current control accordingly
+      digitalWrite(led, HIGH);
+      ReadSensors();
+      CCUpdatePWM();
+    } else {
+      analogWrite(mdEn, 0);
+    }
+  } else if (runMode == 'stop') {
     analogWrite(mdEn, 0);
+  } else if (runMode == 'poten') {
+    digitalWrite(led, HIGH);
+    potVal = map(analogRead(potPin), 0, 1023, 0, pwmCeiling);  // setting PWM ceiling at 200 (max 255)
+    analogWrite(mdEn, potVal);
+    ReadSensors();
   }
-
 }
+
