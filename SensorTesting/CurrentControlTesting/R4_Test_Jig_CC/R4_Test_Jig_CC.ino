@@ -49,7 +49,7 @@ References:
 #define led LED_BUILTIN
 
 // Misc.
-char runMode = 'run'; // can be 'run' or 'stop' or 'poten'
+String runMode = "run"; // can be 'run' or 'stop' or 'poten'
 int potVal; // for potentiometer manual PWM control
 int sensVVal = 0;
 int sensCVal = 0;
@@ -58,7 +58,7 @@ unsigned long scaledVolt;
 float realVolt = 0;
 float realAmp = 0;
 double currentSensorSensitivity = 66; // mv/A
-int pwmCeiling = 200;
+int pwmCeiling = 80;
 
 // LED control (for PWM state visualization)
 int in1State = LOW;
@@ -79,7 +79,7 @@ unsigned int total; // holds <= 64 analogReads
 byte numReadings = 64;
 float offset = 512.1; // calibrate zero current
 float span = 0.066; // calibrate max current | ~0.07315 is for 30A sensor
-float current; // holds final current, in A
+double current; // holds final current, in A
 float rawData;
 
 // Current control
@@ -87,15 +87,17 @@ int pwm = 25;
 int duty;
 int setT = 10; // 23 // in N*m
 double k_IT = 0.1282; // in A/(N*m)
-float setI = 2; // in A
+double setI = 4.00; // in A
 float deltaI;
 float torque; // in N*m
 
 // PID
 double setIPID, currentPID, outPID; // define PID variable
-double Kp=4, Ki=0.03, Kd=2;  // specify initial tuning parameters
+double Kp=5, Ki=0.04, Kd=3;  // specify initial tuning parameters
 int errPWM;
-PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
+// PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
+PID myPID(&current, &outPID, &setI, Kp, Ki, Kd, DIRECT);
+double maxCorrect = 10;
 
 // Current sensor offset correction
 float currentOffset = 0;  // in A
@@ -119,7 +121,7 @@ void ReadSensors() {
     reading = scale.read();
     reading = -reading - 1500000;
   } else {
-    Serial.println("HX711 not found.");
+    // Serial.println("HX711 not found.");
   }
   dReading = reading - lastReading;
   if (dReading > 0) {
@@ -135,19 +137,7 @@ void ReadSensors() {
   GetCurrentValue();
   current -= currentOffset;
 
-  // Print values here, then record using Realterm and process using Excel
-  deltaI = setI - current;
-  Serial.print(deltaI);       // in A
-  Serial.print(",");
-  Serial.print(setI);       // in A
-  Serial.print(",");  
-  Serial.print(reading);     // in kg
-  Serial.print(",");
-  Serial.print(realVolt);   // in V
-  Serial.print(",");
-  Serial.print(current);    // in A
-  Serial.print(",");
-  Serial.println(pwm);     // 0-255
+  CCUpdatePWM();
 }
 
 void CCUpdatePWM() {
@@ -155,8 +145,9 @@ void CCUpdatePWM() {
   currentPID = current;
   setIPID = setI;
   myPID.Compute();
-  pwm = int((double(pwm)*100.0 + outPID*100.0)) / 100;
-  if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
+  // pwm = int((double(pwm)*100.0 + outPID*100.0)) / 100;
+  pwm += int(outPID);
+  if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 5;}
   analogWrite(mdEn, pwm);
 
   // // Current control (not PID)
@@ -190,31 +181,46 @@ void setup() {
   pinMode(mdIn1, OUTPUT);
   pinMode(mdIn2, OUTPUT);
   pinMode(led, OUTPUT);
-  Timer1.initialize(200000);
+  Timer1.initialize(5000);
   Timer1.attachInterrupt(ReadSensors);
   digitalWrite(led, LOW);
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
-  myPID.SetOutputLimits(0, pwmCeiling);
+  myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   myPID.SetMode(AUTOMATIC);
   CalibrateCurrent();
   delay(1500);
+  Serial.println("Starting now.");
   digitalWrite(mdIn1, LOW);
   digitalWrite(mdIn2, HIGH);
 }
 
 void loop() {
-  if(runMode == 'run') {
+  if(runMode == "run") {
     if (current < 15) {
       // Read sensors and update PWM for current control accordingly
       digitalWrite(led, HIGH);
-      ReadSensors();
-      CCUpdatePWM();
+
+      // Print values here, then record using Realterm and process using Excel
+      deltaI = setI - current;
+      Serial.print(deltaI);       // in A
+      Serial.print(",");
+      Serial.print(setI);       // in A
+      Serial.print(",");  
+      Serial.print(reading);     // in kg
+      Serial.print(",");
+      Serial.print(realVolt);   // in V
+      Serial.print(",");
+      Serial.print(current);    // in A
+      Serial.print(",");
+      Serial.print(pwm);     // 0-255
+      Serial.print(",");
+      Serial.println(outPID);
     } else {
       analogWrite(mdEn, 0);
     }
-  } else if (runMode == 'stop') {
+  } else if (runMode == "stop") {
     analogWrite(mdEn, 0);
-  } else if (runMode == 'poten') {
+  } else if (runMode == "poten") {
     digitalWrite(led, HIGH);
     potVal = map(analogRead(potPin), 0, 1023, 0, pwmCeiling);  // setting PWM ceiling at 200 (max 255)
     analogWrite(mdEn, potVal);
