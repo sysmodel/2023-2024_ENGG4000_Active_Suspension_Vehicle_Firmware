@@ -3,9 +3,9 @@
 *
 * Authors: Gregory Stewart, John Estafanos, Andrew Kennah, Patrick Laforest
 * Creation Date: Jan 22, 2024
-* Last Update: Jan 25, 2024
+* Last Update: Jan 26, 2024
 * Board: Uno R4 Minima
-* Version: 2
+* Version: 3
 *
 I/O:
 - force sensor: digital inputs
@@ -23,6 +23,7 @@ Functions & Descriptions:
 - GetCurrentValue(): Runs code to read the current sensor and translate its output into amps.
 - ReadSensors(): Runs the current value acquisition function and also obtains the strain gauge value and the current.
 - CCUpdatePWM(): Uses a controller to output an appropriate correction to the PWM based on current value error.
+- CalibrateCurrent(): In the setup, takes a few iterations to record the current input at 0A so that it may be used for correction.
 
 References:
 - Link: https://forum.arduino.cc/t/is-there-a-good-replacement-for-timerone/1182956/10
@@ -97,8 +98,9 @@ int errPWM;
 PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
 
 // Current sensor offset correction
-float currentOffset;  // in A
-
+float currentOffset = 0;  // in A
+int offsetWindow = 100;
+float currentSum;
 
 
 //---------------------------------------------------------------------
@@ -131,6 +133,7 @@ void ReadSensors() {
 
   // Check current sensor
   GetCurrentValue();
+  current -= currentOffset;
 
   // Print values here, then record using Realterm and process using Excel
   deltaI = setI - current;
@@ -163,6 +166,18 @@ void CCUpdatePWM() {
   // analogWrite(mdEn, pwm);
 }
 
+void CalibrateCurrent() {
+  for (int i = 0; i < offsetWindow; i++)
+  {
+    GetCurrentValue();
+    currentSum += current;
+    if (i == (offsetWindow-1)) {
+      currentOffset = currentSum / float(offsetWindow-1);
+    }
+  }
+  
+}
+
 
 //---------------------------------------------------------------------
 
@@ -181,6 +196,7 @@ void setup() {
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
   myPID.SetOutputLimits(0, pwmCeiling);
   myPID.SetMode(AUTOMATIC);
+  CalibrateCurrent();
   delay(1500);
   digitalWrite(mdIn1, LOW);
   digitalWrite(mdIn2, HIGH);
