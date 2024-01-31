@@ -35,7 +35,7 @@ References:
 
 
 // Libraries
-#include "Timer_AGT_One.h"
+#include "DueTimer.h"
 #include "HX711.h"
 #include <PID_v1.h>
 
@@ -93,7 +93,7 @@ float torque; // in N*m
 
 // PID
 double setIPID, currentPID, outPID; // define PID variable
-double Kp=0.5, Ki=0, Kd=0;  // specify initial tuning parameters
+double Kp=2, Ki=0, Kd=0;  // specify initial tuning parameters
 int errPWM;
 // PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
 PID myPID(&current, &outPID, &setI, Kp, Ki, Kd, DIRECT);
@@ -106,7 +106,7 @@ float currentSum;
 
 // Set up PWM offset for PID use
 int pwmOffset = 0;
-float resistance = 0.4;  // in ohm, measured 0.2234 before
+float resistance = 0.2234;  // in ohm
 float setV = 0;
 
 
@@ -188,8 +188,7 @@ void setup() {
   pinMode(mdIn1, OUTPUT);
   pinMode(mdIn2, OUTPUT);
   pinMode(led, OUTPUT);
-  Timer1.initialize(5000);
-  Timer1.attachInterrupt(ReadSensors);
+  Timer3.attachInterrupt(ReadSensors).start(1000);
   digitalWrite(led, LOW);
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
   myPID.SetOutputLimits(-maxCorrect, maxCorrect);
@@ -212,17 +211,17 @@ void loop() {
       deltaI = setI - current;
       Serial.print(millis());
       Serial.print(",");
-      Serial.print(deltaI);       // in A
+      Serial.print(deltaI);     // in A
       Serial.print(",");
       Serial.print(setI);       // in A
       Serial.print(",");  
-      Serial.print(reading);     // in kg
+      Serial.print(reading);    // in kg
       Serial.print(",");
       Serial.print(realVolt);   // in V
       Serial.print(",");
       Serial.print(current);    // in A
       Serial.print(",");
-      Serial.print(pwm);     // 0-255
+      Serial.print(pwm);        // 0-255
       Serial.print(",");
       Serial.print(pwmOffset);
       Serial.print(",");
@@ -235,21 +234,8 @@ void loop() {
   } else if (runMode == "poten") {
     digitalWrite(led, HIGH);
     potVal = map(analogRead(potPin), 0, 1023, 0, pwmCeiling);  // setting PWM ceiling at 200 (max 255)
-    potVal = 40;
     analogWrite(mdEn, potVal);
-    Serial.print(millis());
-    Serial.print(",");
-    Serial.print(deltaI);       // in A
-    Serial.print(",");
-    Serial.print(setI);       // in A
-    Serial.print(",");  
-    Serial.print(reading);     // in kg
-    Serial.print(",");
-    Serial.print(realVolt);   // in V
-    Serial.print(",");
-    Serial.print(current);    // in A
-    Serial.print(",");
-    Serial.println(potVal);     // 0-255
+    ReadSensors();
   }
 }
 
