@@ -15,23 +15,30 @@
 #define mdIn2 9 //low or high signal for direction, complements mdIn1
 #define led LED_BUILTIN
 #define ADCCurrent 3
+#define pwmCeiling 50
 
 
+static int csAnalog; // current sensor analog
+static double current; // non-filtered current
+static double fcurrent; // filtered current
+
+// static double fcurrent = 5; // filtered current
 
 // struct sensVals {
 
 // }
 
-class DueTest {
-public:
+// class DueTest {
+// public:
   
-}
+// }
 
 void InitStuff();
 double GetCurrent();
 double CalibrateCurrent();
 float GetVoltage();
 int CCUpdatePWM(double setCurr, double curr, float setVolt, float volt);
+double GetFilteredCurrent(double fcurrentOffset);
 
 
 #endif // TEST_HEADER_H
