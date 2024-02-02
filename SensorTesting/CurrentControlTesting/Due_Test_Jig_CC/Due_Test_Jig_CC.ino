@@ -38,6 +38,16 @@ References:
 #include "Due_CCTest_Header.h"
 
 
+
+
+
+
+String runMode = "run"; // can be 'run' or 'stop' or 'poten'
+int potVal; // for potentiometer manual PWM control
+float resistance = 0.2234;  // in ohm
+double maxCorrect = pwmCeiling;
+
+
 //---------------------------------------------------------------------
 
 
@@ -51,7 +61,8 @@ void setup() {
   pinMode(led, OUTPUT);
   Timer3.attachInterrupt(ReadSensors).start(1000);
   digitalWrite(led, LOW);
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
+  // scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN, 128);
+  // scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   myPID.SetMode(AUTOMATIC);
   CalibrateCurrent();
@@ -76,8 +87,8 @@ void loop() {
       Serial.print(",");
       Serial.print(setI);       // in A
       Serial.print(",");  
-      Serial.print(reading);    // in kg
-      Serial.print(",");
+      // Serial.print(reading);    // in kg
+      // Serial.print(",");
       Serial.print(realVolt);   // in V
       Serial.print(",");
       Serial.print(current);    // in A
@@ -96,7 +107,7 @@ void loop() {
     digitalWrite(led, HIGH);
     potVal = map(analogRead(potPin), 0, 1023, 0, pwmCeiling);  // setting PWM ceiling at 200 (max 255)
     analogWrite(mdEn, potVal);
-    ReadSensors();
+    // ReadSensors();
   }
 }
 

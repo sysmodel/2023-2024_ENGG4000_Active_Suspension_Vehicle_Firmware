@@ -1,7 +1,13 @@
 #include "Due_CCTest_Header.h"
 
+
+
+
 void GetCurrentValue() {
-  total = 0; // reset
+  byte numReadings = 64;
+  float offset = 512.1; // calibrate zero current
+  float span = 0.066; // calibrate max current | ~0.07315 is for 30A sensor
+  unsigned int total = 0; // reset
   for (int i = 0; i < numReadings; i++) total += analogRead(sensC);
   current = (total / numReadings - offset) * span;
 }
@@ -21,8 +27,8 @@ void ReadSensors() {
   // }
 
   // Check voltage sensor
-  sensVVal = analogRead(sensV);
-  scaledVolt = map(sensVVal, 0, 1023, 0, 5000);
+  int sensVVal = analogRead(sensV);
+  unsigned long scaledVolt = map(sensVVal, 0, 1023, 0, 5000);
   realVolt = scaledVolt * 0.005;  // in volts
 
   // Check current sensor
@@ -42,21 +48,14 @@ void CCUpdatePWM() {
   pwm = pwmOffset + int(outPID);
   if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
   analogWrite(mdEn, pwm);
-
-  // // Current control (not PID)
-  // deltaI = setI - current;
-  // pwm = pwm + deltaI*6;
-  // if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
-  // analogWrite(mdEn, pwm);
 }
 
 void CalibrateCurrent() {
+  float currentSum;
   for (int i = 0; i < offsetWindow; i++)
   {
     GetCurrentValue();
     currentSum += current;
-    if (i == (offsetWindow-1)) {
-      currentOffset = currentSum / float(offsetWindow-1);
-    }
   }
+  currentOffset = currentSum / float(offsetWindow-1);
 }
