@@ -14,14 +14,16 @@ double currentOffset;
 float setV = resistance * setI;
 int potVal; // for potentiometer manual PWM control
 double deltaI; // in A
+double outOffset = 0; // in A
+double sum;
+int cnt = 0;
 
 
 
 void ReadSensors() {
-  readCurrent = GetFilteredCurrent(0)-currentOffset+70;
+  readCurrent = GetFilteredCurrent(currentOffset) - outOffset;
   readVoltage = GetVoltage();
 }
-
 
 void setup() {
   InitStuff();
@@ -34,6 +36,11 @@ void setup() {
 
 void loop() {
 
+  // if ((abs(readCurrent) < 50) && (cnt > 40)) {cnt = 0; sum = 0;}
+  for (;cnt < 50; cnt++) {
+    sum += readCurrent;
+  }
+  outOffset = sum/(cnt+1);
 
   if (runMode == "poten") {
     setI = double(map(analogRead(potPin), 0, 1023, 0, 5000)) / 1000.0;
@@ -44,16 +51,20 @@ void loop() {
 
   // // Print values here, then record using Realterm and process using Excel
   // deltaI = setI - readCurrent;
-  Serial.print(millis());
-  Serial.print(",");
+  // Serial.print(millis());
+  // Serial.print(",");
   // Serial.print(deltaI);       // in A
   // Serial.print(",");
   // Serial.print(setI);       // in A
   // Serial.print(",");  
   // // Serial.print(reading);     // in kg
   // // Serial.print(",");
-  Serial.print(csAnalog);   // in V
+  Serial.print(outOffset);
   Serial.print(",");
+  Serial.print(TestOutput() - int(outOffset));
+  Serial.print(",");
+  // Serial.print(currentOffset);
+  // Serial.print(",");
   // Serial.print(readVoltage);   // in V
   // Serial.print(",");
   Serial.println(readCurrent);    // in A
@@ -64,6 +75,6 @@ void loop() {
   // Serial.print(",");
   // Serial.println(outPID);
 
-  delay(20);
+  // delay(20);
 
 }

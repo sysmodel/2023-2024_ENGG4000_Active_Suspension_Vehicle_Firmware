@@ -7,7 +7,7 @@ ADS1115 ADS(0x48);
 
 unsigned int total; // holds <= 64 analogReads
 byte numReadings = 64;
-float offset = 511; // calibrate zero current
+float offset = 495; // calibrate zero current
 float span = 0.066; // calibrate max current | ~0.07315 is for 30A sensor
 double current; // holds final current, in A
 double fcurrent; // filtered current
@@ -36,7 +36,7 @@ void FilterOutput() {
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(250000);
+  Serial.begin(115200);
   // Serial.println(__FILE__);
   // Serial.print("ADS1X15_LIB_VERSION: ");
   // Serial.println(ADS1X15_LIB_VERSION);
@@ -87,7 +87,7 @@ void loop() {
   // Serial.print(" , ");
   Serial.print(csVoltage);
   Serial.print(" , ");
-  Serial.print(nowtime);
+  Serial.print(analog);
   Serial.print(" , ");
   Serial.print(current);
   Serial.print(" , ");

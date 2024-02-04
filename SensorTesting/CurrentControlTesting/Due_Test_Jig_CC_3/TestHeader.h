@@ -34,11 +34,12 @@ static double fcurrent; // filtered current
 // }
 
 void InitStuff();
-double GetCurrent();
+double GetCurrent(int currOff);
 double CalibrateCurrent();
 float GetVoltage();
 int CCUpdatePWM(double setCurr, double curr, float setVolt, float volt);
 double GetFilteredCurrent(double fcurrentOffset);
+int TestOutput();
 
 
 #endif // TEST_HEADER_H

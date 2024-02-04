@@ -3,7 +3,7 @@
 
 
 static double currentVal;
-static int offsetWindow = 300;
+static int offsetWindow = 500;
 
 ADS1115 ADS(0x48);
 static float f = ADS.toVoltage(1);  // voltage factor
@@ -51,30 +51,46 @@ float GetVoltage() {
 }
 
 double GetFilteredCurrent(double fcurrentOffset) {
-  double current = GetCurrent();
+  double current = GetCurrent(fcurrentOffset);
   lasttime = nowtime;
   nowtime = millis();
-  fcurrent = fcurrent + (current - (fcurrent + fcurrentOffset)) * double(nowtime - lasttime) / double(1000 * timeConstant) - fcurrentOffset;
+  fcurrent = fcurrent + (current - fcurrent) * double(nowtime - lasttime) / double(1000 * timeConstant);
   // fcurrent = fcurrent / 1000.0;
   return fcurrent;
 }
 
-double GetCurrent() {
+double GetCurrent(int currOff) {
   int16_t val = ADS.readADC(ADCCurrent);
   csAnalog = int(val * f * 1000.0);
-  current = (csAnalog - 2491)/(0.066);
+  current = double(csAnalog - int(currOff))/(0.066);
   return current;
 }
 
+// double CalibrateCurrent() {
+//   float currentSum = 0;
+
+//   for (int i = 0; i < offsetWindow; i++)
+//   {
+//     currentVal = GetFilteredCurrent(0);
+//     currentSum += currentVal;
+//   }
+//   double offset = currentSum / float(offsetWindow-1);
+//   return offset;
+// }
 double CalibrateCurrent() {
   float currentSum = 0;
-
   for (int i = 0; i < offsetWindow; i++)
   {
-    currentVal = GetFilteredCurrent(0);
+    double a = GetCurrent(0);
+    currentVal = csAnalog;
     currentSum += currentVal;
   }
-  double offset = currentSum / float(offsetWindow-1);
+  double offset = currentSum / float(offsetWindow);
   return offset;
 }
 
+int TestOutput() {
+  // double b = GetCurrent(2400);
+  // return b;
+  return current;
+}
