@@ -25,8 +25,8 @@
 #define mdIn1 8 //high or low signal for direction, complements mdIn2
 #define mdIn2 9 //low or high signal for direction, complements mdIn1
 #define led LED_BUILTIN
-#define pwmCeiling 80
-#define offsetWindow 1000
+// #define pwmCeiling 80
+// #define offsetWindow 1000
 
 
 //---------------------------------------------------------------------
@@ -34,53 +34,53 @@
 // *** Global Variables ***
 
 // Misc.
-// int sensVVal = 0;
-// int sensCVal = 0;
-// unsigned long scaledVolt;
-float realVolt = 0;
-// float realAmp = 0;
-// double currentSensorSensitivity = 66; // mv/A
-// const int pwmCeiling;
+extern int sensVVal = 0;
+extern int sensCVal = 0;
+extern unsigned long scaledVolt;
+extern float realVolt = 0;
+extern float realAmp = 0;
+extern double currentSensorSensitivity = 66; // mv/A
+extern const int pwmCeiling = 80;
 
-// Strain gauge pins and object
-// const int LOADCELL_DOUT_PIN = 5;
-// const int LOADCELL_SCK_PIN = 6;
-// long reading;
-// long lastReading;
-// unsigned long dReading;
-// float weight;
-// HX711 scale;  // object for strain gauge
+// Strain gauge pins
+extern const int LOADCELL_DOUT_PIN = 5;
+extern const int LOADCELL_SCK_PIN = 6;
+extern long reading;
+extern long lastReading;
+extern unsigned long dReading;
+extern float weight;
+// extern HX711 scale;  // object for strain gauge
 
 // Current sensing
-// unsigned int total; // holds <= 64 analogReads
-// byte numReadings = 64;
-// float offset = 512.1; // calibrate zero current
-// float span = 0.066; // calibrate max current | ~0.07315 is for 30A sensor
-double current; // holds final current, in A
+extern unsigned int total; // holds <= 64 analogReads
+extern byte numReadings = 64;
+extern float offset = 512.1; // calibrate zero current
+extern float span = 0.066; // calibrate max current | ~0.07315 is for 30A sensor
+extern double current; // holds final current, in A
 
 // Current control
-int pwm = 25;
-double k_IT = 0.1282; // in A/(N*m)
-double setI = 4.00; // in A
-float deltaI;
-float torque; // in N*m
+extern int pwm = 25;
+extern double k_IT = 0.1282; // in A/(N*m)
+extern double setI = 4.00; // in A
+extern float deltaI;
+extern float torque; // in N*m
 
 // PID
-double setIPID, currentPID, outPID; // define PID variable
-double Kp=2, Ki=0, Kd=0;  // specify initial tuning parameters
-int errPWM;
+extern double setIPID, currentPID, outPID; // define PID variable
+extern double Kp=2, Ki=0, Kd=0;  // specify initial tuning parameters
+extern int errPWM;
 // PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
-PID myPID(&current, &outPID, &setI, Kp, Ki, Kd, DIRECT);
-// double maxCorrect = pwmCeiling;
+// PID myPID(&current, &outPID, &setI, Kp, Ki, Kd, DIRECT);
+extern double maxCorrect = pwmCeiling;
 
 // Current sensor offset correction
-float currentOffset = 0;  // in A
-// int offsetWindow = 1000;
-// float currentSum;
+extern float currentOffset = 0;  // in A
+extern int offsetWindow = 1000;
+extern float currentSum;
 
 // Set up PWM offset for PID use
-int pwmOffset = 0;
-float setV = 0;
+extern int pwmOffset = 0;
+extern float setV = 0;
 
 
 //---------------------------------------------------------------------

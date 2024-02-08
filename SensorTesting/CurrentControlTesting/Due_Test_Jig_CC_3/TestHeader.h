@@ -24,14 +24,7 @@ static double fcurrent; // filtered current
 
 // static double fcurrent = 5; // filtered current
 
-// struct sensVals {
 
-// }
-
-// class DueTest {
-// public:
-  
-// }
 
 void InitStuff();
 double GetCurrent(int currOff);

@@ -18,15 +18,6 @@
 
 
 
-// struct sensVals {
-
-// }
-
-class DueTest {
-public:
-  
-}
-
 void InitStuff();
 double GetCurrent();
 double CalibrateCurrent();
