@@ -1,12 +1,13 @@
 #ifndef TEST_HEADER_H
 #define TEST_HEADER_H
 
+//------------------------------------------------------------------
 
+#include <Arduino.h>
 #include "DueTimer.h"
 #include "HX711.h"
 #include <PID_v1.h>
 #include "ADS1X15.h"
-
 
 #define potPin A0
 #define sensV A1
@@ -14,26 +15,36 @@
 #define mdIn1 8 //high or low signal for direction, complements mdIn2
 #define mdIn2 9 //low or high signal for direction, complements mdIn1
 #define led LED_BUILTIN
-#define ADCCurrent 3
-#define pwmCeiling 50
+#define ADCCurrent 3 // for pin number on ADC device
 
-
-static int csAnalog; // current sensor analog
-static double current; // non-filtered current
-static double fcurrent; // filtered current
-
-// static double fcurrent = 5; // filtered current
+//------------------------------------------------------------------
 
 extern PID myPID;
 extern ADS1115 ADS;
+extern HX711 scale;  // object for strain gauge
 
+extern double currentOffset;
+extern double current; // non-filtered current
+extern int csAnalog; // current sensor analog
+extern float voltage;
+extern double fcurrent; // filtered current
+extern int pwmOffset;
+extern int pwm;
+extern double setIPID, currentPID, outPID; // define PID variable
+extern float timeConstant; // time constant in s
+extern double Kp, Ki, Kd;  // specify PID tuning parameters
+extern long readingSG; // strain gauge reading
+extern double maxCorrect;
+extern const int LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN; // digital output & SCK pin for HX711
+
+//------------------------------------------------------------------
 
 void InitStuff();
-double GetCurrent(int currOff);
-double CalibrateCurrent();
-float GetVoltage();
-int CCUpdatePWM(double setCurr, double curr, float setVolt, float volt);
-double GetFilteredCurrent(double fcurrentOffset);
+void GetCurrent();
+void CalibrateCurrent();
+void GetVoltage();
+void GetFilteredCurrent();
 
+//------------------------------------------------------------------
 
 #endif // TEST_HEADER_H
