@@ -27,6 +27,8 @@ float timeConstant = 0.01; // time constant in s
 double setIPID, currentPID, outPID; // define PID variable
 PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
 
+String direction = "CW"; // can be CW or CCW
+
 //------------------------------------------------------------------
 
 void InitStuff() {
@@ -75,4 +77,14 @@ void GetFilteredCurrent() {
   nowtime = millis();
   fcurrent = fcurrent + (current - fcurrent) * double(nowtime - lasttime) / double(1000 * timeConstant);
   // fcurrent = fcurrent / 1000.0;
+}
+
+void SetDirec(String dir) {
+  if (dir == "CW") {
+    digitalWrite(mdIn1, LOW);
+    digitalWrite(mdIn2, HIGH);
+  } else if (dir == "CCW") {
+    digitalWrite(mdIn1, HIGH);
+    digitalWrite(mdIn2, LOW);
+  }
 }

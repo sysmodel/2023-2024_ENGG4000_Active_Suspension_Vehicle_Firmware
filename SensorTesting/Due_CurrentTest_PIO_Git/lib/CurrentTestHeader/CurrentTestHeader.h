@@ -37,6 +37,8 @@ extern long readingSG; // strain gauge reading
 extern double maxCorrect;
 extern const int LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN; // digital output & SCK pin for HX711
 
+extern String direction;
+
 //------------------------------------------------------------------
 
 void InitStuff();
@@ -44,6 +46,7 @@ void GetCurrent();
 void CalibrateCurrent();
 void GetVoltage();
 void GetFilteredCurrent();
+void SetDirec(String dir);
 
 //------------------------------------------------------------------
 

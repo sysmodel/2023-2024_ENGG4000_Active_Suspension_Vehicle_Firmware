@@ -46,13 +46,13 @@ double deltaI; // in A
 //------------------------------------------------------------------
 
 void ReadSensors() {
-  GetFilteredCurrent();
+  GetCurrent();
   GetVoltage();
 }
 
 void CCUpdatePWM() {
   setIPID = setI;
-  currentPID = fcurrent;
+  currentPID = current;
   myPID.Compute();
   pwmOffset = int(setV / voltage * 255.0);
   pwm = pwmOffset + int(outPID);
@@ -75,8 +75,7 @@ void ReadSG() {
 void setup() {
   myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   InitStuff();
-  digitalWrite(mdIn1, LOW);
-  digitalWrite(mdIn2, HIGH);
+  SetDirec("CW");
   Timer1.attachInterrupt(ReadSensors).start(3000);
   Timer2.attachInterrupt(CCUpdatePWM).start(1500);
   Timer3.attachInterrupt(ReadSG).start(2000);
@@ -92,7 +91,7 @@ void loop() {
   }
 
   // Print values here, then record using Realterm and process using Excel
-  deltaI = setI - fcurrent;
+  deltaI = setI - current;
   Serial.print(millis());
   Serial.print(",");
   Serial.print(deltaI);       // in A
@@ -105,7 +104,7 @@ void loop() {
   Serial.print(",");
   Serial.print(voltage);   // in V
   Serial.print(",");
-  Serial.print(fcurrent);    // in A
+  Serial.print(current);    // in A
   Serial.print(",");
   Serial.print(pwm);     // 0-255
   Serial.print(",");
