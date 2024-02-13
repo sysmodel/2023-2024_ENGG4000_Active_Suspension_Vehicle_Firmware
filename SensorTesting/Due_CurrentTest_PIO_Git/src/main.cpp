@@ -76,9 +76,10 @@ void setup() {
   myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   InitStuff();
   SetDirec("CW");
-  Timer1.attachInterrupt(ReadSensors).start(3000);
-  Timer2.attachInterrupt(CCUpdatePWM).start(1500);
-  Timer3.attachInterrupt(ReadSG).start(2000);
+  Timer1.attachInterrupt(ReadSensors).start(5000);
+  // Timer2.attachInterrupt(CCUpdatePWM).start(1500);
+  analogWrite(mdEn, 26);
+  // Timer3.attachInterrupt(ReadSG).start(10000);
   Serial.println("Starting in 1s.");
   delay(1000);
 }
@@ -93,23 +94,27 @@ void loop() {
   // Print values here, then record using Realterm and process using Excel
   deltaI = setI - current;
   Serial.print(millis());
-  Serial.print(",");
-  Serial.print(deltaI);       // in A
+  // Serial.print(",");
+  // Serial.print(deltaI);       // in A
   Serial.print(",");
   Serial.print(setI);       // in A
+  // Serial.print(",");  
+  // Serial.print(setV);     // in units (45 gram/unit)
   Serial.print(",");  
-  Serial.print(readingSG);     // in units (45 gram/unit)
+  Serial.print(csVolt);
+  // Serial.print(",");
+  // Serial.print(currentOffset);
   Serial.print(",");
-  Serial.print(currentOffset);
+  Serial.print(csAnalog);
   Serial.print(",");
   Serial.print(voltage);   // in V
   Serial.print(",");
   Serial.print(current);    // in A
   Serial.print(",");
-  Serial.print(pwm);     // 0-255
-  Serial.print(",");
-  Serial.println(pwmOffset);
+  Serial.println(pwm);     // 0-255
+  // Serial.print(",");
+  // Serial.println(pwmOffset);
 
-  // delay(20);
+  // delay(500);
 
 }

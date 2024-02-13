@@ -39,6 +39,8 @@ extern const int LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN; // digital output & SCK pi
 
 extern String direction;
 
+extern float csVolt;
+
 //------------------------------------------------------------------
 
 void InitStuff();
