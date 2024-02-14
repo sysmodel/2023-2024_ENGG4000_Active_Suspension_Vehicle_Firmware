@@ -30,9 +30,10 @@ PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
 String direction = "CW"; // can be CW or CCW
 
 float csVolt;
-static float shuntResis = 0.0249;
+static float shuntResis = 0.013333333;
 static int16_t val,val0,val2;
 static float csAn2,csAn0;
+static float dividerRatio = 0.3125;
 
 //------------------------------------------------------------------
 
@@ -63,19 +64,21 @@ void GetVoltage() {
 void GetCurrent() {
   val0 = ADS.readADC(0);
   // val2 = ADS.readADC(2);
-  val2 = ADS.readADC_Differential_0_1();
+  val2 = ADS.readADC_Differential_2_3();
   // val = ADS.readADC(ADCCurrent);
   csAnalog = int(val * f * 1000.0);
-  csAn2 = val2 * f * 1000.0;
+  // csAn2 = val2 * f * 1000.0;
+  csAn2 = ADS.toVoltage(val2) * 1000.0;
   csAn0 = val0 * f * 1000.0;
   // csVolt = float(csAnalog)/1000.0/0.5;
   // csVolt = ((float(csAn3)-float(csAn2))/1000.0)/0.5;
-  csVolt = abs(csAn2)/0.5/0.011458;
-  if (direction == "CW") {
-    current = ((float(csAnalog)/1000.0)/0.5)/shuntResis;
-  } else if (direction == "CCW") {
-    current = (voltage*float(pwm)/255.0-float(csAnalog)/1000.0)/0.5/shuntResis;
-  }
+  csVolt = csAn2/dividerRatio;
+  current = csVolt/shuntResis;
+  // if (direction == "CW") {
+  //   current = ((float(csAnalog)/1000.0)/dividerRatio)/shuntResis;
+  // } else if (direction == "CCW") {
+  //   current = (voltage*float(pwm)/255.0-float(csAnalog)/1000.0)/dividerRatio/shuntResis;
+  // }
   // current = double(csAnalog) - currentOffset;
 }
 

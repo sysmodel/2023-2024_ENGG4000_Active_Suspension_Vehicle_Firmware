@@ -78,7 +78,7 @@ void setup() {
   SetDirec("CW");
   Timer1.attachInterrupt(ReadSensors).start(5000);
   // Timer2.attachInterrupt(CCUpdatePWM).start(1500);
-  analogWrite(mdEn, 26);
+  analogWrite(mdEn, 52);
   // Timer3.attachInterrupt(ReadSG).start(10000);
   Serial.println("Starting in 1s.");
   delay(1000);
@@ -96,16 +96,16 @@ void loop() {
   Serial.print(millis());
   // Serial.print(",");
   // Serial.print(deltaI);       // in A
-  Serial.print(",");
-  Serial.print(setI);       // in A
+  // Serial.print(",");
+  // Serial.print(setI);       // in A
   // Serial.print(",");  
   // Serial.print(setV);     // in units (45 gram/unit)
   Serial.print(",");  
   Serial.print(csVolt);
   // Serial.print(",");
   // Serial.print(currentOffset);
-  Serial.print(",");
-  Serial.print(csAnalog);
+  // Serial.print(",");
+  // Serial.print(csAnalog);
   Serial.print(",");
   Serial.print(voltage);   // in V
   Serial.print(",");
@@ -115,6 +115,6 @@ void loop() {
   // Serial.print(",");
   // Serial.println(pwmOffset);
 
-  // delay(500);
+  delay(100);
 
 }
