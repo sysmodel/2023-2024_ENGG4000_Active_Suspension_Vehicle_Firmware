@@ -31,11 +31,11 @@ References:
 //------------------------------------------------------------------
 
 // *** Setting variables ***
-#define pwmCeiling 50
-String runMode = "run"; // can be 'run' or 'stop' or 'poten'
+int pwmCeiling = 100;
+String runMode = "poten"; // can be 'run' or 'stop' or 'poten'
 double setI = 4.00; // in A
-float resistance = 0.2234;  // in ohm
-double Kp=2, Ki=0, Kd=0;  // specify PID tuning parameters
+float resistance = 0.7;  // in ohm
+double Kp=10, Ki=2, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 50;
 
 // *** Variable declarations ***
@@ -46,13 +46,14 @@ double deltaI; // in A
 //------------------------------------------------------------------
 
 void ReadSensors() {
-  GetCurrent();
+  GetCurrent(currentOffset);
+  // GetFilteredCurrent();
   GetVoltage();
 }
 
 void CCUpdatePWM() {
   setIPID = setI;
-  currentPID = current;
+  currentPID = current + 0.3;
   myPID.Compute();
   pwmOffset = int(setV / voltage * 255.0);
   pwm = pwmOffset + int(outPID);
@@ -73,13 +74,13 @@ void ReadSG() {
 //------------------------------------------------------------------
 
 void setup() {
-  myPID.SetOutputLimits(-maxCorrect, maxCorrect);
+  // myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   InitStuff();
   SetDirec("CW");
-  Timer1.attachInterrupt(ReadSensors).start(5000);
-  // Timer2.attachInterrupt(CCUpdatePWM).start(1500);
-  analogWrite(mdEn, 52);
-  // Timer3.attachInterrupt(ReadSG).start(10000);
+  Timer1.attachInterrupt(ReadSensors).start(3000);
+  Timer2.attachInterrupt(CCUpdatePWM).start(5000);
+  // analogWrite(mdEn, 25);
+  Timer3.attachInterrupt(ReadSG).start(100000);
   Serial.println("Starting in 1s.");
   delay(1000);
 }
@@ -87,33 +88,36 @@ void setup() {
 void loop() {
 
   if (runMode == "poten") {
-    setI = double(map(analogRead(potPin), 0, 1023, 0, 5000)) / 1000.0;
+    setI = double(map(analogRead(potPin), 0, 1023, 0, 3300)) / 1000.0;
     setV = resistance * setI;
+    // setI = double(map(analogRead(potPin), 0, 1023, 0, pwmCeiling));
+    // if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
+    // analogWrite(mdEn, pwm);
   }
 
   // Print values here, then record using Realterm and process using Excel
   deltaI = setI - current;
   Serial.print(millis());
-  // Serial.print(",");
-  // Serial.print(deltaI);       // in A
-  // Serial.print(",");
-  // Serial.print(setI);       // in A
-  // Serial.print(",");  
-  // Serial.print(setV);     // in units (45 gram/unit)
+  Serial.print(",");
+  Serial.print(deltaI);       // in A
+  Serial.print(",");
+  Serial.print(setI);       // in A
+  Serial.print(",");
+  Serial.print(readingSG);     // in units (45 gram/unit)
   Serial.print(",");  
-  Serial.print(csVolt);
-  // Serial.print(",");
-  // Serial.print(currentOffset);
-  // Serial.print(",");
-  // Serial.print(csAnalog);
+  Serial.print(csAnalog);
+  Serial.print(",");
+  Serial.print(currentOffset);
   Serial.print(",");
   Serial.print(voltage);   // in V
   Serial.print(",");
   Serial.print(current);    // in A
   Serial.print(",");
-  Serial.println(pwm);     // 0-255
-  // Serial.print(",");
-  // Serial.println(pwmOffset);
+  Serial.print(outPID);
+  Serial.print(",");
+  Serial.print(pwm);     // 0-255
+  Serial.print(",");
+  Serial.println(pwmOffset);
 
   delay(100);
 

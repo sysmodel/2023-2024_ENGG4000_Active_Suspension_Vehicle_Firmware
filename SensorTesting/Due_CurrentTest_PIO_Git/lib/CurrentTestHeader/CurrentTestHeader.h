@@ -44,7 +44,7 @@ extern float csVolt;
 //------------------------------------------------------------------
 
 void InitStuff();
-void GetCurrent();
+void GetCurrent(double currOff);
 void CalibrateCurrent();
 void GetVoltage();
 void GetFilteredCurrent();

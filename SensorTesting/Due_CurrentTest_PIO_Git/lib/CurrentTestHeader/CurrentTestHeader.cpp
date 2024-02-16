@@ -9,7 +9,7 @@ double current; // non-filtered current
 int csAnalog; // current sensor analog
 static float f = ADS.toVoltage(1);  // voltage factor
 static double currentSum = 0;
-static int offsetWindow = 500;
+static int offsetWindow = 1000;
 static int sensVVal;
 static int scaledVolt;
 float voltage;
@@ -18,12 +18,12 @@ static long int lasttime = 0;
 double fcurrent; // filtered current
 long readingSG;
 HX711 scale;  // object for strain gauge
-const int LOADCELL_DOUT_PIN = 5;
-const int LOADCELL_SCK_PIN = 6;
+const int LOADCELL_DOUT_PIN = 12;
+const int LOADCELL_SCK_PIN = 13;
 
 int pwmOffset;
 int pwm;
-float timeConstant = 0.01; // time constant in s
+float timeConstant = 0.06; // time constant in s
 double setIPID, currentPID, outPID; // define PID variable
 PID myPID(&currentPID, &outPID, &setIPID, Kp, Ki, Kd, DIRECT);
 
@@ -33,7 +33,8 @@ float csVolt;
 static float shuntResis = 0.013333333;
 static int16_t val,val0,val2;
 static float csAn2,csAn0;
-static float dividerRatio = 0.3125;
+// static float dividerRatio = 0.3125;
+static float dividerRatio = 0.066;
 
 //------------------------------------------------------------------
 
@@ -61,19 +62,15 @@ void GetVoltage() {
   voltage = float(scaledVolt) * 0.005;  // in volts
 }
 
-void GetCurrent() {
-  val0 = ADS.readADC(0);
+void GetCurrent(double currOff) {
+  // val0 = ADS.readADC(0);
   // val2 = ADS.readADC(2);
-  val2 = ADS.readADC_Differential_2_3();
-  // val = ADS.readADC(ADCCurrent);
-  csAnalog = int(val * f * 1000.0);
-  // csAn2 = val2 * f * 1000.0;
-  csAn2 = ADS.toVoltage(val2) * 1000.0;
-  csAn0 = val0 * f * 1000.0;
-  // csVolt = float(csAnalog)/1000.0/0.5;
-  // csVolt = ((float(csAn3)-float(csAn2))/1000.0)/0.5;
-  csVolt = csAn2/dividerRatio;
-  current = csVolt/shuntResis;
+  // val2 = ADS.readADC_Differential_2_3();
+  val = ADS.readADC(ADCCurrent);
+  csAnalog = ADS.toVoltage(val) * 1000.0;
+  // csAn2 = ADS.toVoltage(val2) * 1000.0;
+  // csVolt = csAn2/dividerRatio;
+  current = csAnalog/dividerRatio/1000 - currOff;
   // if (direction == "CW") {
   //   current = ((float(csAnalog)/1000.0)/dividerRatio)/shuntResis;
   // } else if (direction == "CCW") {
@@ -83,9 +80,10 @@ void GetCurrent() {
 }
 
 void CalibrateCurrent() {
+  analogWrite(mdEn, 0);
   currentSum = 0;
   for (int i = 0; i < offsetWindow; i++) {
-    GetCurrent();
+    GetCurrent(0);
     currentSum += current;
   }
   currentOffset = currentSum / double(offsetWindow);
@@ -93,7 +91,7 @@ void CalibrateCurrent() {
 
 void GetFilteredCurrent() {
   // double current = GetCurrent(fcurrentOffset);
-  GetCurrent();
+  GetCurrent(currentOffset);
   lasttime = nowtime;
   nowtime = millis();
   fcurrent = fcurrent + (current - fcurrent) * double(nowtime - lasttime) / double(1000 * timeConstant);
