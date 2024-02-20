@@ -6,8 +6,9 @@
 #include <Arduino.h>
 #include "DueTimer.h"
 #include "HX711.h"
-#include <PID_v1.h>
+#include "PID_v1.h"
 #include "ADS1X15.h"
+#include "Adafruit_INA260.h"
 
 #define potPin A0
 #define sensV A1
@@ -22,6 +23,7 @@
 extern PID myPID;
 extern ADS1115 ADS;
 extern HX711 scale;  // object for strain gauge
+extern Adafruit_INA260 ina260;  // object for current sensor
 
 extern double currentOffset;
 extern double current; // non-filtered current
@@ -41,6 +43,9 @@ extern String direction;
 
 extern float csVolt;
 
+extern int16_t currentINA;
+extern int16_t currentOffsetINA;
+
 //------------------------------------------------------------------
 
 void InitStuff();
@@ -49,6 +54,8 @@ void CalibrateCurrent();
 void GetVoltage();
 void GetFilteredCurrent();
 void SetDirec(String dir);
+void GetCurrentINA(int16_t offset);
+void CalibrateCurrentINA();
 
 //------------------------------------------------------------------
 

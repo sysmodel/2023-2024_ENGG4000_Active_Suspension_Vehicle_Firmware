@@ -3,12 +3,13 @@
 //------------------------------------------------------------------
 
 ADS1115 ADS(0x48);
+Adafruit_INA260 ina260 = Adafruit_INA260();
 
 double currentOffset;
 double current; // non-filtered current
 int csAnalog; // current sensor analog
 static float f = ADS.toVoltage(1);  // voltage factor
-static double currentSum = 0;
+static int currentSum = 0;
 static int offsetWindow = 1000;
 static int sensVVal;
 static int scaledVolt;
@@ -36,23 +37,37 @@ static float csAn2,csAn0;
 // static float dividerRatio = 0.3125;
 static float dividerRatio = 0.066;
 
+int16_t currentINA;
+int16_t currentOffsetINA;
+
 //------------------------------------------------------------------
 
 void InitStuff() {
   Serial.begin(115200);
+
   pinMode(sensV, INPUT);
   pinMode(mdEn, OUTPUT);
   pinMode(mdIn1, OUTPUT);
   pinMode(mdIn2, OUTPUT);
   pinMode(led, OUTPUT);
+  digitalWrite(led, LOW);
+
   Wire.begin();
   ADS.begin();
   ADS.setDataRate(7);
   ADS.setGain(0);
-  digitalWrite(led, LOW);
+
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   myPID.SetMode(AUTOMATIC);
-  CalibrateCurrent();
+
+  if (!ina260.begin()) {
+    Serial.println("Couldn't find INA260 chip");
+    while (1);
+  }
+  Serial.println("Found INA260 chip");
+
+  // CalibrateCurrent();
+  CalibrateCurrentINA();
   Serial.print("Current offset: ");Serial.println(currentOffset,3);
 }
 
@@ -106,4 +121,18 @@ void SetDirec(String dir) {
     digitalWrite(mdIn1, HIGH);
     digitalWrite(mdIn2, LOW);
   }
+}
+
+void GetCurrentINA(int16_t offset) {
+  currentINA = ina260.readCurrent() - offset;
+}
+
+void CalibrateCurrentINA() {
+  analogWrite(mdEn, 0);
+  currentSum = 0;
+  for (int i = 0; i < offsetWindow; i++) {
+    GetCurrentINA(0);
+    currentSum += currentINA;
+  }
+  currentOffsetINA = currentSum / offsetWindow;
 }

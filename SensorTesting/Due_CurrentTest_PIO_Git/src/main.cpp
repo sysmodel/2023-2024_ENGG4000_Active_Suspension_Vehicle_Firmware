@@ -4,7 +4,7 @@
 * Authors: Gregory Stewart, John Estafanos, Andrew Kennah, Patrick Laforest
 * Creation Date: Jan 22, 2024
 * Last Update: Jan 26, 2024
-* Board: Uno R4 Minima
+* Board: Due
 * Version: 3
 *
 I/O:
@@ -34,7 +34,7 @@ References:
 int pwmCeiling = 100;
 String runMode = "poten"; // can be 'run' or 'stop' or 'poten'
 double setI = 4.00; // in A
-float resistance = 0.7;  // in ohm
+float resistance = 0.7;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
 double Kp=10, Ki=2, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 50;
 
@@ -46,8 +46,9 @@ double deltaI; // in A
 //------------------------------------------------------------------
 
 void ReadSensors() {
-  GetCurrent(currentOffset);
+  // GetCurrent(currentOffset);
   // GetFilteredCurrent();
+  GetCurrentINA(currentOffsetINA);
   GetVoltage();
 }
 
@@ -80,7 +81,7 @@ void setup() {
   Timer1.attachInterrupt(ReadSensors).start(3000);
   Timer2.attachInterrupt(CCUpdatePWM).start(5000);
   // analogWrite(mdEn, 25);
-  Timer3.attachInterrupt(ReadSG).start(100000);
+  Timer3.attachInterrupt(ReadSG).start(10000);
   Serial.println("Starting in 1s.");
   delay(1000);
 }
@@ -111,7 +112,7 @@ void loop() {
   Serial.print(",");
   Serial.print(voltage);   // in V
   Serial.print(",");
-  Serial.print(current);    // in A
+  Serial.print(currentINA);    // in A
   Serial.print(",");
   Serial.print(outPID);
   Serial.print(",");
@@ -119,6 +120,6 @@ void loop() {
   Serial.print(",");
   Serial.println(pwmOffset);
 
-  delay(100);
+  delay(50);
 
 }
