@@ -43,8 +43,8 @@ extern String direction;
 
 extern float csVolt;
 
-extern int16_t currentINA;
-extern int16_t currentOffsetINA;
+extern float currentINA;
+extern float currentOffsetINA;
 
 //------------------------------------------------------------------
 
@@ -54,7 +54,7 @@ void CalibrateCurrent();
 void GetVoltage();
 void GetFilteredCurrent();
 void SetDirec(String dir);
-void GetCurrentINA(int16_t offset);
+void GetCurrentINA(float offset);
 void CalibrateCurrentINA();
 
 //------------------------------------------------------------------

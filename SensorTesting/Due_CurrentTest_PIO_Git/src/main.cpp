@@ -31,7 +31,7 @@ References:
 //------------------------------------------------------------------
 
 // *** Setting variables ***
-int pwmCeiling = 100;
+int pwmCeiling = 150;
 String runMode = "poten"; // can be 'run' or 'stop' or 'poten'
 double setI = 4.00; // in A
 float resistance = 0.7;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
@@ -54,7 +54,7 @@ void ReadSensors() {
 
 void CCUpdatePWM() {
   setIPID = setI;
-  currentPID = current + 0.3;
+  currentPID = currentINA;
   myPID.Compute();
   pwmOffset = int(setV / voltage * 255.0);
   pwm = pwmOffset + int(outPID);
@@ -68,7 +68,7 @@ void ReadSG() {
     readingSG = scale.read();
     readingSG = -readingSG - 1500000;
   } else {
-    Serial.println("HX711 not found.");
+    // Serial.println("HX711 not found.");
   }
 }
 
@@ -78,10 +78,11 @@ void setup() {
   // myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   InitStuff();
   SetDirec("CW");
-  Timer1.attachInterrupt(ReadSensors).start(3000);
-  Timer2.attachInterrupt(CCUpdatePWM).start(5000);
+  CalibrateCurrentINA();
+  Timer1.attachInterrupt(ReadSensors).start(18000);
+  Timer2.attachInterrupt(CCUpdatePWM).start(20000);
   // analogWrite(mdEn, 25);
-  Timer3.attachInterrupt(ReadSG).start(10000);
+  // Timer3.attachInterrupt(ReadSG).start(80000);
   Serial.println("Starting in 1s.");
   delay(1000);
 }
@@ -97,28 +98,28 @@ void loop() {
   }
 
   // Print values here, then record using Realterm and process using Excel
-  deltaI = setI - current;
-  Serial.print(millis());
-  Serial.print(",");
+  deltaI = setI - currentINA;
+  // Serial.print(millis());
+  // Serial.print(",");
   Serial.print(deltaI);       // in A
   Serial.print(",");
   Serial.print(setI);       // in A
-  Serial.print(",");
-  Serial.print(readingSG);     // in units (45 gram/unit)
-  Serial.print(",");  
-  Serial.print(csAnalog);
-  Serial.print(",");
-  Serial.print(currentOffset);
+  // Serial.print(",");
+  // Serial.print(readingSG);     // in units (45 gram/unit)
+  // Serial.print(",");  
+  // Serial.print(csAnalog);
+  // Serial.print(",");
+  // Serial.print(currentOffsetINA);
   Serial.print(",");
   Serial.print(voltage);   // in V
   Serial.print(",");
   Serial.print(currentINA);    // in A
+  // Serial.print(",");
+  // Serial.print(outPID);
   Serial.print(",");
-  Serial.print(outPID);
-  Serial.print(",");
-  Serial.print(pwm);     // 0-255
-  Serial.print(",");
-  Serial.println(pwmOffset);
+  Serial.println(pwm);     // 0-255
+  // Serial.print(",");
+  // Serial.println(pwmOffset);
 
   delay(50);
 

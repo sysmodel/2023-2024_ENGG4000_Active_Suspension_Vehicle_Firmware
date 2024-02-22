@@ -9,7 +9,7 @@ double currentOffset;
 double current; // non-filtered current
 int csAnalog; // current sensor analog
 static float f = ADS.toVoltage(1);  // voltage factor
-static int currentSum = 0;
+static float currentSum = 0;
 static int offsetWindow = 1000;
 static int sensVVal;
 static int scaledVolt;
@@ -37,8 +37,8 @@ static float csAn2,csAn0;
 // static float dividerRatio = 0.3125;
 static float dividerRatio = 0.066;
 
-int16_t currentINA;
-int16_t currentOffsetINA;
+float currentINA;
+float currentOffsetINA;
 
 //------------------------------------------------------------------
 
@@ -53,9 +53,9 @@ void InitStuff() {
   digitalWrite(led, LOW);
 
   Wire.begin();
-  ADS.begin();
-  ADS.setDataRate(7);
-  ADS.setGain(0);
+  // ADS.begin();
+  // ADS.setDataRate(7);
+  // ADS.setGain(0);
 
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   myPID.SetMode(AUTOMATIC);
@@ -65,10 +65,10 @@ void InitStuff() {
     while (1);
   }
   Serial.println("Found INA260 chip");
+  ina260.setAveragingCount(INA260_COUNT_4);
+  ina260.setCurrentConversionTime(INA260_TIME_8_244_ms);
 
   // CalibrateCurrent();
-  CalibrateCurrentINA();
-  Serial.print("Current offset: ");Serial.println(currentOffset,3);
 }
 
 void GetVoltage() {
@@ -102,6 +102,7 @@ void CalibrateCurrent() {
     currentSum += current;
   }
   currentOffset = currentSum / double(offsetWindow);
+  Serial.print("Current offset: ");Serial.println(currentOffset,3);
 }
 
 void GetFilteredCurrent() {
@@ -123,16 +124,18 @@ void SetDirec(String dir) {
   }
 }
 
-void GetCurrentINA(int16_t offset) {
-  currentINA = ina260.readCurrent() - offset;
+void GetCurrentINA(float offset) {
+  currentINA = (float(ina260.readCurrent())/1000.0 - offset)*1.14 + 0.02;
 }
 
 void CalibrateCurrentINA() {
   analogWrite(mdEn, 0);
   currentSum = 0;
-  for (int i = 0; i < offsetWindow; i++) {
-    GetCurrentINA(0);
-    currentSum += currentINA;
+  for (int j = 0; j < offsetWindow; j++) {
+    GetCurrentINA(0.0);
+    currentSum += float(currentINA);
+    delay(5);
   }
-  currentOffsetINA = currentSum / offsetWindow;
+  currentOffsetINA = currentSum / float(offsetWindow);
+  Serial.print("Current offset: ");Serial.println(currentOffsetINA,3);
 }
