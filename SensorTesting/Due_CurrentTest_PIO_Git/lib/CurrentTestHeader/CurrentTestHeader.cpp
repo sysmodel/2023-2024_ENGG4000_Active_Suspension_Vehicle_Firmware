@@ -66,7 +66,7 @@ void InitStuff() {
   }
   Serial.println("Found INA260 chip");
   ina260.setAveragingCount(INA260_COUNT_4);
-  ina260.setCurrentConversionTime(INA260_TIME_8_244_ms);
+  // ina260.setCurrentConversionTime(INA260_TIME_8_244_ms);
 
   // CalibrateCurrent();
 }
@@ -125,7 +125,7 @@ void SetDirec(String dir) {
 }
 
 void GetCurrentINA(float offset) {
-  currentINA = (float(ina260.readCurrent())/1000.0 - offset)*1.14 + 0.02;
+  currentINA = (float(ina260.readCurrent())/1000.0 - offset)*1.15 + 0.02;
 }
 
 void CalibrateCurrentINA() {

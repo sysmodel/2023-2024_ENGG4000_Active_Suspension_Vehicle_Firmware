@@ -31,7 +31,7 @@ References:
 //------------------------------------------------------------------
 
 // *** Setting variables ***
-int pwmCeiling = 150;
+int pwmCeiling = 80;
 String runMode = "poten"; // can be 'run' or 'stop' or 'poten'
 double setI = 4.00; // in A
 float resistance = 0.7;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
@@ -92,7 +92,7 @@ void loop() {
   if (runMode == "poten") {
     setI = double(map(analogRead(potPin), 0, 1023, 0, 3300)) / 1000.0;
     setV = resistance * setI;
-    // setI = double(map(analogRead(potPin), 0, 1023, 0, pwmCeiling));
+    // pwm = map(analogRead(potPin), 0, 1023, 0, pwmCeiling);
     // if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
     // analogWrite(mdEn, pwm);
   }
