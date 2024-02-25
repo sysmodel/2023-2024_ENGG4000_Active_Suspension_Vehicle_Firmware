@@ -31,17 +31,18 @@ References:
 //------------------------------------------------------------------
 
 // *** Setting variables ***
-int pwmCeiling = 80;
+int pwmCeiling = 125;
 String runMode = "poten"; // can be 'run' or 'stop' or 'poten'
 double setI = 4.00; // in A
 float resistance = 0.7;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=10, Ki=2, Kd=0;  // specify PID tuning parameters
+double Kp=6, Ki=12.12, Kd=0.396;  // specify PID tuning parameters
 double maxCorrect = 50;
 
 // *** Variable declarations ***
 float setV = resistance * setI;
 int potVal; // for potentiometer manual PWM control
 double deltaI; // in A
+int pwmStep;
 
 //------------------------------------------------------------------
 
@@ -72,17 +73,28 @@ void ReadSG() {
   }
 }
 
+void StepPotPWM() {
+  if (runMode == "poten") {
+    pwmStep = map(analogRead(potPin), 0, 1023, -2, 2);
+    pwm += pwmStep;
+    if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
+    analogWrite(mdEn, pwm);
+  }
+}
+
 //------------------------------------------------------------------
 
 void setup() {
   // myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   InitStuff();
   SetDirec("CW");
+  pwm = 0;
   CalibrateCurrentINA();
   Timer1.attachInterrupt(ReadSensors).start(18000);
   Timer2.attachInterrupt(CCUpdatePWM).start(20000);
   // analogWrite(mdEn, 25);
   // Timer3.attachInterrupt(ReadSG).start(80000);
+  // Timer4.attachInterrupt(StepPotPWM).start(500000);
   Serial.println("Starting in 1s.");
   delay(1000);
 }
@@ -99,8 +111,8 @@ void loop() {
 
   // Print values here, then record using Realterm and process using Excel
   deltaI = setI - currentINA;
-  // Serial.print(millis());
-  // Serial.print(",");
+  Serial.print(millis());
+  Serial.print(",");
   Serial.print(deltaI);       // in A
   Serial.print(",");
   Serial.print(setI);       // in A
