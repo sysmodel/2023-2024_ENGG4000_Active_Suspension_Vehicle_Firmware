@@ -31,7 +31,7 @@ References:
 //------------------------------------------------------------------
 
 // *** Setting variables ***
-int pwmCeiling = 125;
+int pwmCeiling = 150;
 String runMode = "poten"; // can be 'run' or 'stop' or 'poten'
 double setI = 4.00; // in A
 float resistance = 0.7;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
@@ -93,7 +93,7 @@ void setup() {
   Timer1.attachInterrupt(ReadSensors).start(18000);
   Timer2.attachInterrupt(CCUpdatePWM).start(20000);
   // analogWrite(mdEn, 25);
-  // Timer3.attachInterrupt(ReadSG).start(80000);
+  Timer3.attachInterrupt(ReadSG).start(40000);
   // Timer4.attachInterrupt(StepPotPWM).start(500000);
   Serial.println("Starting in 1s.");
   delay(1000);
@@ -102,7 +102,7 @@ void setup() {
 void loop() {
 
   if (runMode == "poten") {
-    setI = double(map(analogRead(potPin), 0, 1023, 0, 3300)) / 1000.0;
+    setI = double(map(analogRead(potPin), 0, 1023, 0, 6000)) / 1000.0;
     setV = resistance * setI;
     // pwm = map(analogRead(potPin), 0, 1023, 0, pwmCeiling);
     // if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
@@ -116,8 +116,8 @@ void loop() {
   Serial.print(deltaI);       // in A
   Serial.print(",");
   Serial.print(setI);       // in A
-  // Serial.print(",");
-  // Serial.print(readingSG);     // in units (45 gram/unit)
+  Serial.print(",");
+  Serial.print(readingSG);     // in units (45 gram/unit)
   // Serial.print(",");  
   // Serial.print(csAnalog);
   // Serial.print(",");
@@ -133,6 +133,6 @@ void loop() {
   // Serial.print(",");
   // Serial.println(pwmOffset);
 
-  delay(50);
+  // delay(50);
 
 }
