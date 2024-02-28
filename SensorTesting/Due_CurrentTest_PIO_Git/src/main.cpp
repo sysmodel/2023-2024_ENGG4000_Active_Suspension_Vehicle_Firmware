@@ -31,36 +31,44 @@ References:
 //------------------------------------------------------------------
 
 // *** Setting variables ***
-int pwmCeiling = 150;
-String runMode = "poten"; // can be 'run' or 'stop' or 'poten'
-double setI = 4.00; // in A
-float resistance = 0.7;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=6, Ki=12.12, Kd=0.396;  // specify PID tuning parameters
-double maxCorrect = 50;
+int pwmCeiling = 200;
+String runMode = "run"; // can be 'run' or 'stop' or 'poten'
+double setI = 0; // in A
+float resistance = 0.663; //0.663;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
+double Kp=10, Ki=200, Kd=0;  // specify PID tuning parameters
+double maxCorrect = 255;
 
 // *** Variable declarations ***
 float setV = resistance * setI;
 int potVal; // for potentiometer manual PWM control
 double deltaI; // in A
 int pwmStep;
+float setIStep = 0;
+int cnt = 1;
+long int funcTime = 0;
 
 //------------------------------------------------------------------
-
-void ReadSensors() {
-  // GetCurrent(currentOffset);
-  // GetFilteredCurrent();
-  GetCurrentINA(currentOffsetINA);
-  GetVoltage();
-}
 
 void CCUpdatePWM() {
   setIPID = setI;
   currentPID = currentINA;
   myPID.Compute();
+  setV = resistance * setI;
   pwmOffset = int(setV / voltage * 255.0);
   pwm = pwmOffset + int(outPID);
   if (pwm > pwmCeiling) {pwm = pwmCeiling;} else if (pwm < 0) {pwm = 0;}
   analogWrite(mdEn, pwm);
+}
+
+void ReadSensors() {
+  funcTime = micros();
+  // GetCurrent(currentOffset);
+  // GetFilteredCurrent();
+  GetCurrentINA(currentOffsetINA);
+
+
+  CCUpdatePWM();
+  funcTime = micros() - funcTime;
 }
 
 void ReadSG() {
@@ -82,24 +90,33 @@ void StepPotPWM() {
   }
 }
 
+void StepSetI() {
+  setI = cnt * 1.0;
+  cnt++;
+  if (cnt > 8) {cnt = 1;}
+}
+
 //------------------------------------------------------------------
 
 void setup() {
-  // myPID.SetOutputLimits(-maxCorrect, maxCorrect);
+  myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   InitStuff();
   SetDirec("CW");
   pwm = 0;
   CalibrateCurrentINA();
-  Timer1.attachInterrupt(ReadSensors).start(18000);
-  Timer2.attachInterrupt(CCUpdatePWM).start(20000);
+  Timer1.attachInterrupt(ReadSensors).start(10000);
+  // Timer2.attachInterrupt(CCUpdatePWM).start(4000);
   // analogWrite(mdEn, 25);
   Timer3.attachInterrupt(ReadSG).start(40000);
   // Timer4.attachInterrupt(StepPotPWM).start(500000);
+  Timer5.attachInterrupt(StepSetI).start(5000000);
   Serial.println("Starting in 1s.");
   delay(1000);
 }
 
 void loop() {
+
+  GetVoltage();
 
   if (runMode == "poten") {
     setI = double(map(analogRead(potPin), 0, 1023, 0, 6000)) / 1000.0;
@@ -118,6 +135,8 @@ void loop() {
   Serial.print(setI);       // in A
   Serial.print(",");
   Serial.print(readingSG);     // in units (45 gram/unit)
+  // Serial.print(",");
+  // Serial.print(funcTime);
   // Serial.print(",");  
   // Serial.print(csAnalog);
   // Serial.print(",");
@@ -133,6 +152,6 @@ void loop() {
   // Serial.print(",");
   // Serial.println(pwmOffset);
 
-  // delay(50);
+  delay(10);
 
 }

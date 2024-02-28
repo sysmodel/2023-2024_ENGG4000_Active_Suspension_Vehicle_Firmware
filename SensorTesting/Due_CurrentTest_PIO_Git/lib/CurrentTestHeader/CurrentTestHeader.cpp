@@ -22,7 +22,7 @@ HX711 scale;  // object for strain gauge
 const int LOADCELL_DOUT_PIN = 12;
 const int LOADCELL_SCK_PIN = 13;
 
-int pwmOffset;
+int pwmOffset = 0;
 int pwm;
 float timeConstant = 0.06; // time constant in s
 double setIPID, currentPID, outPID; // define PID variable
@@ -59,6 +59,7 @@ void InitStuff() {
 
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   myPID.SetMode(AUTOMATIC);
+  myPID.SetSampleTime(10);
 
   if (!ina260.begin()) {
     Serial.println("Couldn't find INA260 chip");
@@ -125,7 +126,9 @@ void SetDirec(String dir) {
 }
 
 void GetCurrentINA(float offset) {
-  currentINA = (float(ina260.readCurrent())/1000.0 - offset)*1.15 + 0.02;
+  currentINA = float(ina260.readCurrent())/1000.0;
+  currentINA = -0.0105*currentINA*currentINA + 1.1545*currentINA + 0.0286;
+  // currentINA = 1.0746*currentINA + 0.1089;
 }
 
 void CalibrateCurrentINA() {
