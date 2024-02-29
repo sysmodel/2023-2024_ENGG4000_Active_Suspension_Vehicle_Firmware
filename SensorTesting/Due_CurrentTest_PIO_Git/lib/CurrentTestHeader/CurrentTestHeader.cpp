@@ -127,8 +127,11 @@ void SetDirec(String dir) {
 
 void GetCurrentINA(float offset) {
   currentINA = float(ina260.readCurrent())/1000.0;
-  currentINA = -0.0105*currentINA*currentINA + 1.1545*currentINA + 0.0286;
-  // currentINA = 1.0746*currentINA + 0.1089;
+  // currentINA = -0.015*currentINA*currentINA + 1.1545*currentINA + 0.0286;
+  if (currentINA < 0) {
+    currentINA = -currentINA;
+  }
+  currentINA = 1.0637*currentINA + 0.1416;
 }
 
 void CalibrateCurrentINA() {

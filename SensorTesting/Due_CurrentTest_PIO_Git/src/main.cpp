@@ -31,9 +31,9 @@ References:
 //------------------------------------------------------------------
 
 // *** Setting variables ***
-int pwmCeiling = 200;
+int pwmCeiling = 225;
 String runMode = "run"; // can be 'run' or 'stop' or 'poten'
-double setI = 0; // in A
+double setI = 1; // in A
 float resistance = 0.663; //0.663;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
 double Kp=10, Ki=200, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255;
@@ -93,15 +93,15 @@ void StepPotPWM() {
 void StepSetI() {
   setI = cnt * 1.0;
   cnt++;
-  if (cnt > 8) {cnt = 1;}
+  if (cnt > 9) {cnt = 1;}
 }
 
 //------------------------------------------------------------------
 
 void setup() {
-  myPID.SetOutputLimits(-maxCorrect, maxCorrect);
+  SetDirec("CCW");
   InitStuff();
-  SetDirec("CW");
+  myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   pwm = 0;
   CalibrateCurrentINA();
   Timer1.attachInterrupt(ReadSensors).start(10000);
