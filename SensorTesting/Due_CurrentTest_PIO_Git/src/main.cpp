@@ -91,15 +91,16 @@ void StepPotPWM() {
 }
 
 void StepSetI() {
+  int mySets[] = {2, 4, 8, 3, 6, 4};
   setI = cnt * 1.0;
   cnt++;
-  if (cnt > 9) {cnt = 1;}
+  if (cnt > 9) {cnt = 0;}
 }
 
 //------------------------------------------------------------------
 
 void setup() {
-  SetDirec("CCW");
+  SetDirec("CW");
   InitStuff();
   myPID.SetOutputLimits(-maxCorrect, maxCorrect);
   pwm = 0;
