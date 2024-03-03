@@ -34,9 +34,9 @@ References:
 int pwmCeiling = 225;
 String runMode = "run"; // can be 'run' or 'stop' or 'poten'
 double setI = 1; // in A
-float resistance = 0.663; //0.663;  // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
+float resistance = 0.663; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
 double Kp=10, Ki=200, Kd=0;  // specify PID tuning parameters
-double maxCorrect = 255;
+double maxCorrect = 255; // used in myPID.SetOutputLimits() function
 
 // *** Variable declarations ***
 float setV = resistance * setI;
@@ -62,11 +62,7 @@ void CCUpdatePWM() {
 
 void ReadSensors() {
   funcTime = micros();
-  // GetCurrent(currentOffset);
-  // GetFilteredCurrent();
   GetCurrentINA(currentOffsetINA);
-
-
   CCUpdatePWM();
   funcTime = micros() - funcTime;
 }
@@ -138,8 +134,6 @@ void loop() {
   Serial.print(readingSG);     // in units (45 gram/unit)
   // Serial.print(",");
   // Serial.print(funcTime);
-  // Serial.print(",");  
-  // Serial.print(csAnalog);
   // Serial.print(",");
   // Serial.print(currentOffsetINA);
   Serial.print(",");
