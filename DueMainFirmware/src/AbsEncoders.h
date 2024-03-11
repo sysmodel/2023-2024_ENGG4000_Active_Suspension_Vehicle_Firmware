@@ -27,11 +27,11 @@
 
 #include <Arduino.h>
 
-class AbsoluteEncoder {
+class AbsEnc {
 public:
-    AbsoluteEncoder(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution);
-    uint16_t AbsEncPosition();
-    double AbsEncoderVelocity();
+    AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution);
+    uint16_t AbsEncPos();
+    double AbsEncVel();
 
 private:
     uint8_t sckPin;

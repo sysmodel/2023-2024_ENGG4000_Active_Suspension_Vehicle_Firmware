@@ -34,11 +34,11 @@ unsigned long absEncoderTime = 0;
 volatile double absEncoderVel = 0.0;
 
 // Object constructor
-AbsoluteEncoder::AbsoluteEncoder(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution)
+AbsEnc::AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution)
     : sckPin(sckPin), csPin(csPin), sdoPin(sdoPin), resolution(resolution) {
 }
 
-uint16_t AbsoluteEncoder::AbsEncPosition() 
+uint16_t AbsEnc::AbsEncPos() 
 {
     uint8_t i, j; //we'll use these incrementers
     uint16_t currentPosition;
@@ -95,9 +95,9 @@ uint16_t AbsoluteEncoder::AbsEncPosition()
     return currentPosition;
 }
 
-double AbsoluteEncoder::AbsEncoderVelocity() 
+double AbsEnc::AbsEncVel() 
 {
-    absEncoderPosition = AbsEncPosition();
+    absEncoderPosition = AbsEncPos();
     absEncoderTime = micros();
 
     double deltaPosition = absEncoderPosition - absEncoderPreviousPosition;
