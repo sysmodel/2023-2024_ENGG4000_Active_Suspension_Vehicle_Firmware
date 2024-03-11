@@ -132,8 +132,8 @@ void GetCurrent() {
 
 void GetVoltage() {
   voltArray[0] = float(map(analogRead(battCell1Pin), 0, 1023, 0, 3300)) * 0.005;
-  voltArray[1] = float(map(analogRead(battCell2Pin), 0, 1023, 0, 3300)) * 0.005;
-  battVoltage = voltArray[0] + voltArray[1];
+  battVoltage = float(map(analogRead(battCell2Pin), 0, 1023, 0, 3300)) * 0.005;
+  voltArray[1] = battVoltage - voltArray[0];
 }
 
 void GetQuadEncoderData() {
