@@ -66,36 +66,18 @@ double absEncCurrentVelocityFL; // Front Left
 double absEncCurrentVelocityBR; // Back Right
 double absEncCurrentVelocityBL; // Back Left
 
-// Define pins for each encoder
-uint8_t sdoPinFR = 5;
-uint8_t sckPinFR = 6;
-uint8_t csPinFR = 7;
-uint8_t sdoPinFL = 2;
-uint8_t sckPinFL = 3;
-uint8_t csPinFL = 4;
-uint8_t sdoPinBR = 11;
-uint8_t sckPinBR = 12;
-uint8_t csPinBR = 13;
-uint8_t sdoPinBL = 8;
-uint8_t sckPinBL = 9;
-uint8_t csPinBL = 10;
-// John's suggestion for the above. Structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}.
-// uint8_t sdoPin[4] = {5, 2, 11, 8};
-// uint8_t sckPin[4] = {6, 3, 12, 9};
-// uint8_t csPin[4] = {7, 4, 13, 10};
+// Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
+uint8_t sdoPin[4] = {5, 2, 11, 8};
+uint8_t sckPin[4] = {6, 3, 12, 9};
+uint8_t csPin[4] = {7, 4, 13, 10};
 
 //------------------------------------------------------------------
 
-// Creation of absolute encoder objects
-AbsEnc absEncoderFR(sckPinFR, csPinFR, sdoPinFR, resolution);
-AbsEnc absEncoderFL(sckPinFL, csPinFL, sdoPinFL, resolution);
-AbsEnc absEncoderBR(sckPinBR, csPinBR, sdoPinBR, resolution);
-AbsEnc absEncoderBL(sckPinBL, csPinBL, sdoPinBL, resolution);
-// John's suggestion for the above. Structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}.
-// AbsEnc absEncoderFR(sckPin[0], csPin[0], sdoPin[0], resolution);
-// AbsEnc absEncoderFL(sckPin[1], csPin[1], sdoPin[1], resolution);
-// AbsEnc absEncoderBR(sckPin[2], csPin[2], sdoPin[2], resolution);
-// AbsEnc absEncoderBL(sckPin[3], csPin[3], sdoPin[3], resolution);
+// Creation of absolute encoder objects; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
+AbsEnc absEncoderFR(sckPin[0], csPin[0], sdoPin[0], resolution);
+AbsEnc absEncoderFL(sckPin[1], csPin[1], sdoPin[1], resolution);
+AbsEnc absEncoderBR(sckPin[2], csPin[2], sdoPin[2], resolution);
+AbsEnc absEncoderBL(sckPin[3], csPin[3], sdoPin[3], resolution);
 
 // Creation of INA260 current sensor objects
 Adafruit_INA260 ina260FR = Adafruit_INA260();
@@ -200,6 +182,16 @@ void InitStuff() {
   piFL.SetOutputLimits(-maxCorrect, maxCorrect);
   piBR.SetOutputLimits(-maxCorrect, maxCorrect);
   piBL.SetOutputLimits(-maxCorrect, maxCorrect);
+}
+
+void SetDirec(int wheel, String dir) {
+  if (dir == "UP") {
+    digitalWrite(mdIn1Pins[wheel], LOW);
+    digitalWrite(mdIn2Pins[wheel], HIGH);
+  } else if (dir == "DOWN") {
+    digitalWrite(mdIn1Pins[wheel], HIGH);
+    digitalWrite(mdIn2Pins[wheel], LOW);
+  }
 }
 
 //------------------------------------------------------------------
