@@ -50,6 +50,7 @@ uint32_t mdEnPins[4] = {4,5,2,3};
 uint32_t mdIn1Pins[4] = {51,53,47,49};
 uint32_t mdIn2Pins[4] = {50,52,46,48};
 float pwm[4] = {0,0,0,0};
+bool direc[4] = {1,1,1,1}; // motor action directions; 1 is up, 0 is down
 
 // Jetson communication
 float setI[4] = {0,0,0,0}; // array of stored current setpoints
@@ -63,7 +64,7 @@ double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
 double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
 float setV[4] = {0,0,0,0};
 float pwmOffset[4] = {0,0,0,0};
-int pwmCeiling = 0;
+int pwmCeiling = 40;
 
 // Encoders
 uint8_t quadEncoderFlag = 0;
@@ -186,9 +187,21 @@ void InitStuff() {
   ina260FL.begin(0x44);
   ina260BR.begin(0x45);
   ina260BL.begin(0x40);
-  if (!ina260FR.begin() && !ina260FL.begin() && !ina260BR.begin() && !ina260BL.begin()) {
-    Serial.println("Couldn't find INA260 chip");
-    while (1);
+  while (!ina260FR.begin()) {
+    Serial.println("Couldn't find INA260 chip (FR)");
+    // while (1);
+  }
+  while (!ina260FL.begin()) {
+    Serial.println("Couldn't find INA260 chip (FL)");
+    // while (1);
+  }
+  while (!ina260BR.begin()) {
+    Serial.println("Couldn't find INA260 chip (BR)");
+    // while (1);
+  }
+  while (!ina260BL.begin()) {
+    Serial.println("Couldn't find INA260 chip (BL)");
+    // while (1);
   }
   Serial.println("Found INA260 chip");
   ina260FR.setAveragingCount(INA260_COUNT_4);
@@ -239,7 +252,7 @@ void ActuateAction() {
 
 void SineInput() {
   for(i=0;i<4;i++) {
-    setI[i] = float(int(waveformsTable[0][sineCount+i*5])/300);
+    setI[i] = float(int(waveformsTable[0][sineCount+i*5])/700);
   }
   // setI[0] = int(waveformsTable[0][sineCount]);
   // setI[1] = int(waveformsTable[0][sineCount+5]);
@@ -294,13 +307,20 @@ void loop() {
     for(i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
     Serial.println("");
   }
-  Serial.print("Currents: ");
-  for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-  Serial.println("");
-  for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  Serial.println("");
-  Serial.print("Voltage: "); Serial.println(battVoltage,2);
 
+  // Serial.print("Currents: ");
+  // for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+  // Serial.println("");
+  // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+  // Serial.println("");
+  // Serial.print("Voltage: "); Serial.println(battVoltage,2);
+
+  Serial.println("Currents: ");
+  for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+  // Serial.println("");
+  for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+  Serial.print("--");
+  Serial.print("Voltage: "); Serial.println(battVoltage,2);
 
   delay(50);
 }
