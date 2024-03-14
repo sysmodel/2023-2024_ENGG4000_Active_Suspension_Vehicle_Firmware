@@ -25,6 +25,7 @@
 #include "AbsEncoders.h"
 #include "Adafruit_INA260.h"
 #include "PID_v1.h"
+#include "Waveforms.h"
 
 //------------------------------------------------------------------
 
@@ -36,17 +37,22 @@
 //------------------------------------------------------------------
 
 // Variable definitions
-uint8_t quadEncoderFlag = 0;
-uint8_t absEncoderFlag = 0;
-uint8_t resolution = 12;
 float current[4] = {0,0,0,0}; // array of measured current values
 float offset[4] = {0,0,0,0};  // array of current offset values
 int i = 0; // used for indexing
 float voltArray[2] = {0,0};
 float battVoltage = 0;
+long timeCount = millis();
+int sineCount = 0;
+
+// Motor driver
 uint32_t mdEnPins[4] = {14,14,14,14};
-uint32_t mdIn1Pins[4] = {14,14,14,14};
-uint32_t mdIn2Pins[4] = {14,14,14,14};
+uint32_t mdIn1Pins[4] = {51,53,47,49};
+uint32_t mdIn2Pins[4] = {50,52,46,48};
+float pwm[4] = {0,0,0,0};
+
+// Jetson communication
+float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
 float resistance = 0.663; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
@@ -55,8 +61,15 @@ double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
 double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
+float setV[4] = {0,0,0,0};
+float pwmOffset[4] = {0,0,0,0};
+int pwmCeiling = 50;
 
-// Define global variable to store abs encoder positions and speeds
+// Encoders
+uint8_t quadEncoderFlag = 0;
+uint8_t absEncoderFlag = 0;
+uint8_t resolution = 12;
+// - Define global variable to store abs encoder positions and speeds
 uint16_t absEncCurrentPositionFR; // Front Right
 uint16_t absEncCurrentPositionFL; // Front Left
 uint16_t absEncCurrentPositionBR; // Back Right
@@ -65,8 +78,7 @@ double absEncCurrentVelocityFR; // Front Right
 double absEncCurrentVelocityFL; // Front Left
 double absEncCurrentVelocityBR; // Back Right
 double absEncCurrentVelocityBL; // Back Left
-
-// Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
+// - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
 uint8_t sdoPin[4] = {5, 2, 11, 8};
 uint8_t sckPin[4] = {6, 3, 12, 9};
 uint8_t csPin[4] = {7, 4, 13, 10};
@@ -93,6 +105,16 @@ PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
 //------------------------------------------------------------------
 
+void SetDirec(int wheel, String dir) {
+  if (dir == "UP") {
+    digitalWrite(mdIn1Pins[wheel], LOW);
+    digitalWrite(mdIn2Pins[wheel], HIGH);
+  } else if (dir == "DOWN") {
+    digitalWrite(mdIn1Pins[wheel], HIGH);
+    digitalWrite(mdIn2Pins[wheel], LOW);
+  }
+}
+
 void GetCurrent() {
   for(i=0;i<4;i++) {
     switch(i) {
@@ -107,7 +129,8 @@ void GetCurrent() {
     }
     if (current[i] < 0) {
     current[i] = -current[i];
-    }
+    SetDirec(i,"DOWN");
+    } else {SetDirec(i,"UP");}
     current[i] = 1.0637*current[i] + 0.1416;
   }
 }
@@ -159,6 +182,10 @@ void InitStuff() {
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
 
   // Begin current sensor reading and set averaging count
+  ina260FR.begin(0x40);
+  ina260FL.begin(0x41);
+  ina260BR.begin(0x44);
+  ina260BL.begin(0x45);
   if (!ina260FR.begin() && !ina260FL.begin() && !ina260BR.begin() && !ina260BL.begin()) {
     Serial.println("Couldn't find INA260 chip");
     while (1);
@@ -184,14 +211,42 @@ void InitStuff() {
   piBL.SetOutputLimits(-maxCorrect, maxCorrect);
 }
 
-void SetDirec(int wheel, String dir) {
-  if (dir == "UP") {
-    digitalWrite(mdIn1Pins[wheel], LOW);
-    digitalWrite(mdIn2Pins[wheel], HIGH);
-  } else if (dir == "DOWN") {
-    digitalWrite(mdIn1Pins[wheel], HIGH);
-    digitalWrite(mdIn2Pins[wheel], LOW);
+void CCUpdatePWM() {
+  for(i=0;i<4;i++) {
+    setIPI[i] = setI[i];
+    currentPI[i] = current[i];
+    setV[i] = resistance * setI[i];
+    pwmOffset[i] = int(setV[i] / battVoltage * 255.0); // Feedforward (FF) control
   }
+  piFR.Compute();
+  piFL.Compute();
+  piBR.Compute();
+  piBL.Compute();
+  for(i=0;i<4;i++) {
+    pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
+    if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
+    analogWrite(mdEnPins[i], pwm[i]);
+  }
+}
+
+void ActuateAction() {
+  // This function calls on independent functions to read the current and ...
+  // ... compute the FF-PI controller to actuate a PWM accordingly.
+
+  GetCurrent();
+  CCUpdatePWM();
+}
+
+void SineInput() {
+  for(i=0;i<4;i++) {
+    setI[i] = float(int(waveformsTable[0][sineCount+i*5])/300);
+  }
+  // setI[0] = int(waveformsTable[0][sineCount]);
+  // setI[1] = int(waveformsTable[0][sineCount+5]);
+  // setI[2] = int(waveformsTable[0][sineCount+10]);
+  // setI[3] = int(waveformsTable[0][sineCount+15]);
+  sineCount++;
+  if((sineCount+15) >= maxSamplesNum) {sineCount = 0;}
 }
 
 //------------------------------------------------------------------
@@ -205,12 +260,16 @@ void setup() {
 
   // Initialize Timmer Interupts for 33Hz
   Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  Timer2.attachInterrupt(GetAbsEncoderData).start(30303); // Timer for Abs Encoder (33Hz)
+  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
+  Timer4.attachInterrupt(SineInput).start(8000); // Timer for sinusoidal input to actuators
 }
 
 void loop() {
 
   GetVoltage();
+
+  timeCount = millis();
 
   /*
   // Print out quadrature encoder data (Validation)
@@ -228,6 +287,14 @@ void loop() {
     Serial.print(" FR Abs Encoder Velocity: ");
     Serial.println(absEncCurrentVelocityFR);
     absEncoderFlag = 0;
+
+
+    // Independent of the abs. encoders but should print at the same time
+    Serial.print("Currents: ");
+    for(i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
+    Serial.println("");
+
   }
-  delay(500);
+
+  delay(50);
 }
