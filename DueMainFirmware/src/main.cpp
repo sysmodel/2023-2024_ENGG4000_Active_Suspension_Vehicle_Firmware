@@ -31,8 +31,8 @@
 
 #define led LED_BUILTIN
 #define steerPotPin A4
-#define battCell1Pin A1
-#define battCell2Pin A0
+#define battCell1Pin A3
+#define battCell2Pin A2
 
 //------------------------------------------------------------------
 
@@ -63,7 +63,7 @@ double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
 double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
 float setV[4] = {0,0,0,0};
 float pwmOffset[4] = {0,0,0,0};
-int pwmCeiling = 50;
+int pwmCeiling = 0;
 
 // Encoders
 uint8_t quadEncoderFlag = 0;
@@ -259,8 +259,8 @@ void setup() {
   while (!Serial) {delay(1);}
 
   // Initialize Timmer Interupts for 33Hz
-  Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
+  // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
   Timer4.attachInterrupt(SineInput).start(8000); // Timer for sinusoidal input to actuators
 }
@@ -294,6 +294,13 @@ void loop() {
     for(i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
     Serial.println("");
   }
+  Serial.print("Currents: ");
+  for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+  Serial.println("");
+  for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+  Serial.println("");
+  Serial.print("Voltage: "); Serial.println(battVoltage,2);
+
 
   delay(50);
 }
