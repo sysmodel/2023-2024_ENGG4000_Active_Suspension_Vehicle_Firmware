@@ -27,21 +27,35 @@
 
 #include <Arduino.h>
 
-class AbsEnc {
-public:
-    AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution);
-    uint16_t AbsEncPos();
-    double AbsEncVel();
+class AbsEnc
+{
+    public: 
+        // Default constructor 
+        AbsEnc() {} // do not use 
 
-private:
-    uint8_t sckPin;
-    uint8_t csPin;
-    uint8_t sdoPin;
-    uint8_t resolution;
-    int16_t absEncoderPosition;
-    int16_t absEncoderCurrentPosition;
-    unsigned long absEncoderTime;
-    unsigned long absEncoderPreviousTime;
+        // Actual constructor
+        AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution);
+
+        // Initialize pins
+        void initAbsEnc();
+
+        // Get position 
+        uint16_t AbsEncPos();
+
+        //Get velocity
+        double AbsEncVel();
+        
+
+    private:
+        uint8_t _sckPin;
+        uint8_t _csPin;
+        uint8_t _sdoPin;
+        uint8_t _resolution;
+        uint32_t _varNOP = 0;
+
+        // NOP delay function
+        void DelayNOP();
+        
 };
 
-#endif
+#endif 

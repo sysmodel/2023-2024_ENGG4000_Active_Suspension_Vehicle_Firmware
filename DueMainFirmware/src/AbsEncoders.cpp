@@ -24,8 +24,6 @@
 
 #include "AbsEncoders.h"
 
-#define NOP __asm__ __volatile__ ("nop\n\t")
-
 // Define Variables
 int32_t absEncoderPreviousPosition = 0;
 int32_t absEncoderPosition = 0;
@@ -33,23 +31,39 @@ unsigned long absEncoderLastTime = micros();
 unsigned long absEncoderTime = 0;
 volatile double absEncoderVel = 0.0;
 
-// Object constructor
+// Actual constructor
 AbsEnc::AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution)
-    : sckPin(sckPin), csPin(csPin), sdoPin(sdoPin), resolution(resolution) {
+{
+    _sckPin  = sckPin;
+    _csPin = csPin;
+    _sdoPin = sdoPin;
+    _resolution = resolution;
+
+    initAbsEnc();
+};
+
+// Initialize pins
+void AbsEnc::initAbsEnc()
+{
+    pinMode(_sckPin, OUTPUT);
+    pinMode(_csPin, OUTPUT);
+    pinMode(_sdoPin, INPUT);
 }
 
-uint16_t AbsEnc::AbsEncPos() 
+uint16_t AbsEnc::AbsEncPos()
 {
+    noInterrupts();
     uint8_t i, j; //we'll use these incrementers
-    uint16_t currentPosition;
-    uint8_t _clockCounts = resolution + 2; //the AMT23 includes 2 additional bits in the response that are used as checkbits
+    uint16_t currentPosition = 0;
+    uint8_t _clockCounts = _resolution + 2; //the AMT23 includes 2 additional bits in the response that are used as checkbits
     bool binaryArray[_clockCounts]; //we'll read each bit one at a time and put in array. SSI comes out reversed so this helps reorder
     bool bitHolder; //this variable holds the current bit in our read loop
     bool checkBit0, checkBit1; //the frist two bits in the position response are checkbits used to check the validity of the position response
+    _varNOP = 0; 
 
     //drop cs low and wait the minimum required time. This is done with NOPs
-    digitalWrite(csPin, LOW);
-    for (i = 0; i < 5; i++) NOP;
+    digitalWrite(_csPin, LOW);
+    for (i = 0; i < 26; i++) DelayNOP();
 
     //We will clock the encoder the number of times (resolution + 2), incrementing with 'j'
     //note that this method of bit-banging doesn't give a reliable clock speed.
@@ -58,17 +72,18 @@ uint16_t AbsEnc::AbsEncPos()
     for (j = 0; j < _clockCounts; j++)
     {
         //first we lower the clock line and wait until the pin state has fully changed
-        digitalWrite(sckPin, LOW);
-        for (i = 0; i < 10; i++) NOP;
+        digitalWrite(_sckPin, LOW);
+        for (i = 0; i < 26; i++) DelayNOP();
 
         //now we go high with the clock. no need to wait with NOPs because the pin read we'll do next times sufficient time
-        digitalWrite(sckPin, HIGH);
+        digitalWrite(_sckPin, HIGH);
+        for (i = 0; i < 26; i++) DelayNOP();
 
         //Grab the data off of the SDO line and place it into the binary array
-        binaryArray[j] = digitalRead(sdoPin);
+        binaryArray[j] = digitalRead(_sdoPin);
     }
     //release cs line, position has been fully received
-    digitalWrite(csPin, HIGH);
+    digitalWrite(_csPin, HIGH);
 
     //now we'll reverse the order of the binary array so that the bit ordering matches binary
     for (i = 0, j = _clockCounts - 1; i < (_clockCounts / 2); i++, j--)
@@ -92,7 +107,9 @@ uint16_t AbsEnc::AbsEncPos()
         currentPosition = 0xFFFF; //bad pos, return 0xFFFF which is not a valid value
     }
 
+    interrupts();
     return currentPosition;
+    
 }
 
 double AbsEnc::AbsEncVel() 
@@ -101,12 +118,20 @@ double AbsEnc::AbsEncVel()
     absEncoderTime = micros();
 
     double deltaPosition = absEncoderPosition - absEncoderPreviousPosition;
-    double deltaTime = (absEncoderTime - absEncoderLastTime) / 1000.0;
+
+    /* Need to convert position to anglular or linear result */
+
+    double deltaTime = (absEncoderTime - absEncoderLastTime) / 1000;
     double velocity = deltaPosition / deltaTime; 
 
     absEncoderPreviousPosition = absEncoderPosition;
     absEncoderLastTime = absEncoderTime;
 
     return velocity;
+}
+
+void AbsEnc::DelayNOP()
+{
+    _varNOP ++;
 }
 
