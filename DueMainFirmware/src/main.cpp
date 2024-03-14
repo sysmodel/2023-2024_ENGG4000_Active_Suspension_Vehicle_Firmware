@@ -246,7 +246,7 @@ void SineInput() {
   // setI[2] = int(waveformsTable[0][sineCount+10]);
   // setI[3] = int(waveformsTable[0][sineCount+15]);
   sineCount++;
-  if((sineCount+15) >= maxSamplesNum) {sineCount = 0;}
+  if((sineCount+i*5) >= maxSamplesNum) {sineCount = 0;}
 }
 
 //------------------------------------------------------------------
