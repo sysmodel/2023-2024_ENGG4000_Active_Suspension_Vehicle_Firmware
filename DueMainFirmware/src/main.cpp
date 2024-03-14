@@ -30,9 +30,9 @@
 //------------------------------------------------------------------
 
 #define led LED_BUILTIN
-#define steerPotPin A0
+#define steerPotPin A4
 #define battCell1Pin A1
-#define battCell2Pin A2
+#define battCell2Pin A0
 
 //------------------------------------------------------------------
 
@@ -46,7 +46,7 @@ long timeCount = millis();
 int sineCount = 0;
 
 // Motor driver
-uint32_t mdEnPins[4] = {14,14,14,14};
+uint32_t mdEnPins[4] = {4,5,2,3};
 uint32_t mdIn1Pins[4] = {51,53,47,49};
 uint32_t mdIn2Pins[4] = {50,52,46,48};
 float pwm[4] = {0,0,0,0};
@@ -79,9 +79,9 @@ double absEncCurrentVelocityFL; // Front Left
 double absEncCurrentVelocityBR; // Back Right
 double absEncCurrentVelocityBL; // Back Left
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
-uint8_t sdoPin[4] = {5, 2, 11, 8};
-uint8_t sckPin[4] = {6, 3, 12, 9};
-uint8_t csPin[4] = {7, 4, 13, 10};
+uint8_t sdoPin[4] = {11, 13, 7, 9};
+uint8_t sckPin[4] = {10, 12, 6, 8};
+uint8_t csPin[4] = {25, 24, 27, 26};
 
 //------------------------------------------------------------------
 
@@ -293,7 +293,6 @@ void loop() {
     Serial.print("Currents: ");
     for(i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
     Serial.println("");
-
   }
 
   delay(50);
