@@ -182,10 +182,10 @@ void InitStuff() {
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
 
   // Begin current sensor reading and set averaging count
-  ina260FR.begin(0x40);
-  ina260FL.begin(0x41);
-  ina260BR.begin(0x44);
-  ina260BL.begin(0x45);
+  ina260FR.begin(0x41);
+  ina260FL.begin(0x44);
+  ina260BR.begin(0x45);
+  ina260BL.begin(0x40);
   if (!ina260FR.begin() && !ina260FL.begin() && !ina260BR.begin() && !ina260BL.begin()) {
     Serial.println("Couldn't find INA260 chip");
     while (1);
