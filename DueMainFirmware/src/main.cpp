@@ -44,16 +44,18 @@ float voltArray[2] = {0,0};
 float battVoltage = 0;
 long timeCount = millis();
 int sineCount = 0;
+int funcTime = 0;
 
 // Motor driver
 uint32_t mdEnPins[4] = {4,5,2,3};
 uint32_t mdIn1Pins[4] = {51,53,47,49};
 uint32_t mdIn2Pins[4] = {50,52,46,48};
-float pwm[4] = {0,0,0,0};
-bool direc[4] = {1,1,1,1}; // motor action directions; 1 is up, 0 is down
+int pwm[4] = {0,0,0,0};
+bool direc[4] = {0,0,0,0}; // motor action directions; 1 is up, 0 is down
+bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is down
 
 // Jetson communication
-float setI[4] = {0,0,0,0}; // array of stored current setpoints
+float setI[4] = {-8,-8,-2,-2}; // array of stored current setpoints
 
 // FF-PI controller
 float resistance = 0.663; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
@@ -63,8 +65,8 @@ double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
 double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
 float setV[4] = {0,0,0,0};
-float pwmOffset[4] = {0,0,0,0};
-int pwmCeiling = 40;
+int pwmOffset[4] = {0,0,0,0};
+int pwmCeiling = 120;
 
 // Encoders
 uint8_t quadEncoderFlag = 0;
@@ -106,18 +108,18 @@ PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
 //------------------------------------------------------------------
 
-void SetDirec(int wheel, String dir) {
-  if (dir == "UP") {
+void SetDirec(int wheel, bool dir) {
+  if (dir == 1) {
     digitalWrite(mdIn1Pins[wheel], LOW);
     digitalWrite(mdIn2Pins[wheel], HIGH);
-  } else if (dir == "DOWN") {
+  } else if (dir == 0) {
     digitalWrite(mdIn1Pins[wheel], HIGH);
     digitalWrite(mdIn2Pins[wheel], LOW);
   }
 }
 
 void GetCurrent() {
-  for(i=0;i<4;i++) {
+  for(int i=0;i<4;i++) {
     switch(i) {
       case 0:
         current[i] = float(ina260FR.readCurrent())/1000.0 - offset[i];
@@ -129,9 +131,14 @@ void GetCurrent() {
         current[i] = float(ina260BL.readCurrent())/1000.0 - offset[i];
     }
     if (current[i] < 0) {
-    current[i] = -current[i];
-    SetDirec(i,"DOWN");
-    } else {SetDirec(i,"UP");}
+      current[i] = -current[i];
+      direc[i] = 0;
+      // current[i] = 1.0637*current[i] + 0.1416;
+      // current[i] = -current[i];
+    } else {
+      direc[i] = 1;
+      // current[i] = 1.0637*current[i] + 0.1416;
+    }
     current[i] = 1.0637*current[i] + 0.1416;
   }
 }
@@ -225,7 +232,7 @@ void InitStuff() {
 }
 
 void CCUpdatePWM() {
-  for(i=0;i<4;i++) {
+  for(int i=0;i<4;i++) {
     setIPI[i] = setI[i];
     currentPI[i] = current[i];
     setV[i] = resistance * setI[i];
@@ -235,31 +242,49 @@ void CCUpdatePWM() {
   piFL.Compute();
   piBR.Compute();
   piBL.Compute();
-  for(i=0;i<4;i++) {
+  for(int i=0;i<4;i++) {
     pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
     if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
     analogWrite(mdEnPins[i], pwm[i]);
+    if(direc[i]!=desDirec[i]) {
+      direc[i] = desDirec[i];
+      SetDirec(i,direc[i]);
+    }
   }
 }
 
 void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-PI controller to actuate a PWM accordingly.
-
+  funcTime = micros();
   GetCurrent();
   CCUpdatePWM();
+  funcTime = micros() - funcTime;
 }
 
 void SineInput() {
-  for(i=0;i<4;i++) {
-    setI[i] = float(int(waveformsTable[0][sineCount+i*5])/700);
-  }
-  // setI[0] = int(waveformsTable[0][sineCount]);
-  // setI[1] = int(waveformsTable[0][sineCount+5]);
-  // setI[2] = int(waveformsTable[0][sineCount+10]);
-  // setI[3] = int(waveformsTable[0][sineCount+15]);
-  sineCount++;
-  if((sineCount+i*5) >= maxSamplesNum) {sineCount = 0;}
+  // for(i=0;i<4;i++) {
+  //   setI[i] = float(int(waveformsTable[0][sineCount+i*5]-1000))/800;
+  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
+  // }
+  // // setI[0] = int(waveformsTable[0][sineCount]);
+  // // setI[1] = int(waveformsTable[0][sineCount+5]);
+  // // setI[2] = int(waveformsTable[0][sineCount+10]);
+  // // setI[3] = int(waveformsTable[0][sineCount+15]);
+  // sineCount++;
+  // if((sineCount+i*5) >= maxSamplesNum) {sineCount = 0;}
+
+  // for(i=0;i<4;i++) {
+  //   setI[i] = -1*sineCount+i/2;
+  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
+  // }
+  // sineCount++;
+  // if(sineCount>4) {sineCount=0;}
+  setI[0] = 0;
+  setI[1] = 0;
+  setI[2] = 10;
+  setI[3] = 10;
+  for(int i=0;i<4;i++) {desDirec[i] = 0;}
 }
 
 //------------------------------------------------------------------
@@ -271,11 +296,16 @@ void setup() {
   // Wait until serial port is opened
   while (!Serial) {delay(1);}
 
+  // setI[4] = {-8.0,-8.0,1.0,1.0};
+  for(int i=0;i<4;i++) {Serial.println(setI[i]);}
+  for(int i=0;i<4;i++) {desDirec[i] = 0;}
+  for(int i=0;i<4;i++) {SetDirec(i,0);}
+
   // Initialize Timmer Interupts for 33Hz
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
-  Timer4.attachInterrupt(SineInput).start(8000); // Timer for sinusoidal input to actuators
+  Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
 }
 
 void loop() {
@@ -304,7 +334,7 @@ void loop() {
 
     // Independent of the abs. encoders but should print at the same time
     Serial.print("Currents: ");
-    for(i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
+    for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
     Serial.println("");
   }
 
@@ -316,11 +346,13 @@ void loop() {
   // Serial.print("Voltage: "); Serial.println(battVoltage,2);
 
   Serial.println("Currents: ");
-  for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+  for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
   // Serial.println("");
-  for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+  // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+  for(int i=0;i<4;i++) {Serial.print(setI[i]); Serial.print(",");}
   Serial.print("--");
-  Serial.print("Voltage: "); Serial.println(battVoltage,2);
+  Serial.print("Voltage: "); Serial.print(battVoltage,2);
+  Serial.print(", "); Serial.println(funcTime);
 
-  delay(50);
+  delay(20);
 }
