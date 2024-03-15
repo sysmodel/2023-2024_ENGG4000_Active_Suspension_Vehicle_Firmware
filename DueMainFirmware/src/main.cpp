@@ -45,6 +45,7 @@ float battVoltage = 0;
 long timeCount = millis();
 int sineCount = 0;
 int funcTime = 0;
+int currentFlag = 0;
 
 // Motor driver
 uint32_t mdEnPins[4] = {4,5,2,3};
@@ -55,11 +56,11 @@ bool direc[4] = {0,0,0,0}; // motor action directions; 1 is up, 0 is down
 bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is down
 
 // Jetson communication
-float setI[4] = {-8,-8,-2,-2}; // array of stored current setpoints
+float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
-float resistance = 0.663; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=10, Ki=200, Kd=0;  // specify PID tuning parameters
+float resistance[4] = {0.663*(3/6.2)*(3/2.35)*(3/3.3),0.663,0.663,0.663}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
+double Kp=0, Ki=400, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
@@ -123,24 +124,28 @@ void GetCurrent() {
     switch(i) {
       case 0:
         current[i] = float(ina260FR.readCurrent())/1000.0 - offset[i];
+        break;
       case 1:
         current[i] = float(ina260FL.readCurrent())/1000.0 - offset[i];
+        break;
       case 2:
         current[i] = float(ina260BR.readCurrent())/1000.0 - offset[i];
+        break;
       case 3:
         current[i] = float(ina260BL.readCurrent())/1000.0 - offset[i];
+        break;
     }
     if (current[i] < 0) {
-      current[i] = -current[i];
-      direc[i] = 0;
-      // current[i] = 1.0637*current[i] + 0.1416;
       // current[i] = -current[i];
+      direc[i] = 0;
+      current[i] = 1.0637*current[i] - 0.1416;
     } else {
       direc[i] = 1;
-      // current[i] = 1.0637*current[i] + 0.1416;
+      current[i] = 1.0637*current[i] + 0.1416;
     }
-    current[i] = 1.0637*current[i] + 0.1416;
+    // current[i] = 1.0637*current[i] + 0.1416;
   }
+  currentFlag = 1;
 }
 
 void GetVoltage() {
@@ -190,23 +195,19 @@ void InitStuff() {
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
 
   // Begin current sensor reading and set averaging count
-  ina260FR.begin(0x41);
-  ina260FL.begin(0x44);
-  ina260BR.begin(0x45);
-  ina260BL.begin(0x40);
-  while (!ina260FR.begin()) {
+  if (!ina260FR.begin(0x41)) {
     Serial.println("Couldn't find INA260 chip (FR)");
-    // while (1);
+    while (1);
   }
-  while (!ina260FL.begin()) {
+  if (!ina260FL.begin(0x44)) {
     Serial.println("Couldn't find INA260 chip (FL)");
-    // while (1);
+    while (1);
   }
-  while (!ina260BR.begin()) {
+  if (!ina260BR.begin(0x45)) {
     Serial.println("Couldn't find INA260 chip (BR)");
     // while (1);
   }
-  while (!ina260BL.begin()) {
+  if (!ina260BL.begin(0x40)) {
     Serial.println("Couldn't find INA260 chip (BL)");
     // while (1);
   }
@@ -235,7 +236,7 @@ void CCUpdatePWM() {
   for(int i=0;i<4;i++) {
     setIPI[i] = setI[i];
     currentPI[i] = current[i];
-    setV[i] = resistance * setI[i];
+    setV[i] = resistance[i] * setI[i];
     pwmOffset[i] = int(setV[i] / battVoltage * 255.0); // Feedforward (FF) control
   }
   piFR.Compute();
@@ -244,12 +245,15 @@ void CCUpdatePWM() {
   piBL.Compute();
   for(int i=0;i<4;i++) {
     pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
+    if(pwm[i] < 0) {
+      pwm[i] = -pwm[i];
+      desDirec[i] = 0;
+    } else {
+      desDirec[i] = 1;
+    }
+    SetDirec(i,desDirec[i]);
     if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
     analogWrite(mdEnPins[i], pwm[i]);
-    if(direc[i]!=desDirec[i]) {
-      direc[i] = desDirec[i];
-      SetDirec(i,direc[i]);
-    }
   }
 }
 
@@ -280,11 +284,14 @@ void SineInput() {
   // }
   // sineCount++;
   // if(sineCount>4) {sineCount=0;}
-  setI[0] = 0;
+  setI[0] = -10;
   setI[1] = 0;
-  setI[2] = 10;
-  setI[3] = 10;
-  for(int i=0;i<4;i++) {desDirec[i] = 0;}
+  setI[2] = 0;
+  setI[3] = 0;
+  // for(int i=0;i<4;i++) {
+  //   desDirec[i] = 0;
+  //   SetDirec(i,desDirec[i]);
+  // }
 }
 
 //------------------------------------------------------------------
@@ -306,11 +313,13 @@ void setup() {
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
   Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
+
 }
 
 void loop() {
 
   GetVoltage();
+
 
   timeCount = millis();
 
@@ -345,14 +354,30 @@ void loop() {
   // Serial.println("");
   // Serial.print("Voltage: "); Serial.println(battVoltage,2);
 
+  // if(currentFlag == 1) {
+  //   Serial.println("Currents: ");
+  //   for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+  //   // Serial.println("");
+  //   // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+  //   for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
+  //   Serial.print("--");
+  //   Serial.print("Voltage: "); Serial.print(battVoltage,2);
+  //   Serial.print(", "); Serial.println(funcTime);
+  //   currentFlag = 0;
+  // }
+
   Serial.println("Currents: ");
   for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
   // Serial.println("");
   // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  for(int i=0;i<4;i++) {Serial.print(setI[i]); Serial.print(",");}
+  for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
   Serial.print("--");
   Serial.print("Voltage: "); Serial.print(battVoltage,2);
-  Serial.print(", "); Serial.println(funcTime);
+  Serial.print(", "); Serial.print(funcTime);
+  Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
+  Serial.println("");
+  currentFlag = 0;
 
-  delay(20);
+
+  delay(100);
 }
