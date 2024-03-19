@@ -1,24 +1,3 @@
-/* 
-* Sys-MoDEL Active Suspension Main.ino file
-*
-* Authors: Gregory Stewart, John Estafanos, Andrew Kennah, Patrick Laforest
-* Creation Date: Jan 6, 2024
-* Last Update: March 6, 2024
-*
-* Version 1.0
-*
-* Description: 
-* This code is the Main.ino file that is used to retrieve data from the array of sensors. 
-* Each retrieval of data is done by executing an internal ISR on the Arduino DUE. 
-*
-* Functions & Descriptions: 
-* Name: 
-* Description: 
-*
-* References:
-*
-*/
-
 #include <Arduino.h>
 #include "DueTimer.h"
 #include "QuadEncoder.h"
@@ -60,7 +39,7 @@ float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
 float resistance[4] = {0.663*(3/6.2)*(3/2.35)*(3/3.3),0.663,0.663,0.663}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=0, Ki=400, Kd=0;  // specify PID tuning parameters
+double Kp=0, Ki=0, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
@@ -86,6 +65,9 @@ double absEncCurrentVelocityBL; // Back Left
 uint8_t sdoPin[4] = {11, 13, 7, 9};
 uint8_t sckPin[4] = {10, 12, 6, 8};
 uint8_t csPin[4] = {25, 24, 27, 26};
+
+// Frequency testing
+uint8_t frequency = 1;
 
 //------------------------------------------------------------------
 
@@ -120,7 +102,8 @@ void SetDirec(int wheel, bool dir) {
 }
 
 void GetCurrent() {
-  for(int i=0;i<4;i++) {
+  // Changed for test was 4
+  for(int i=0;i<1;i++) {
     switch(i) {
       case 0:
         current[i] = float(ina260FR.readCurrent())/1000.0 - offset[i];
@@ -135,15 +118,15 @@ void GetCurrent() {
         current[i] = float(ina260BL.readCurrent())/1000.0 - offset[i];
         break;
     }
+    
+    current[i] = 1.0887*current[i];
+
     if (current[i] < 0) {
-      // current[i] = -current[i];
       direc[i] = 0;
-      current[i] = 1.0637*current[i] - 0.1416;
+      
     } else {
       direc[i] = 1;
-      current[i] = 1.0637*current[i] + 0.1416;
     }
-    // current[i] = 1.0637*current[i] + 0.1416;
   }
   currentFlag = 1;
 }
@@ -212,20 +195,28 @@ void InitStuff() {
     // while (1);
   }
   Serial.println("Found INA260 chip");
-  ina260FR.setAveragingCount(INA260_COUNT_4);
-  ina260FL.setAveragingCount(INA260_COUNT_4);
-  ina260BR.setAveragingCount(INA260_COUNT_4);
-  ina260BL.setAveragingCount(INA260_COUNT_4);
+  ina260FR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260FL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260BR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260BL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260FR.setAveragingCount(INA260_COUNT_16);
+  ina260FL.setAveragingCount(INA260_COUNT_16);
+  ina260BR.setAveragingCount(INA260_COUNT_16);
+  ina260BL.setAveragingCount(INA260_COUNT_16);
+  ina260FR.setCurrentConversionTime(INA260_TIME_140_us);
+  ina260FL.setCurrentConversionTime(INA260_TIME_140_us);
+  ina260BR.setCurrentConversionTime(INA260_TIME_140_us);
+  ina260BL.setCurrentConversionTime(INA260_TIME_140_us);
 
   // Set PID mode, sampling time, and output limits
   piFR.SetMode(AUTOMATIC);
   piFL.SetMode(AUTOMATIC);
   piBR.SetMode(AUTOMATIC);
   piBL.SetMode(AUTOMATIC);
-  piFR.SetSampleTime(10);
-  piFL.SetSampleTime(10);
-  piBR.SetSampleTime(10);
-  piBL.SetSampleTime(10);
+  piFR.SetSampleTime(3);
+  piFL.SetSampleTime(3);
+  piBR.SetSampleTime(3);
+  piBL.SetSampleTime(3);
   piFR.SetOutputLimits(-maxCorrect, maxCorrect);
   piFL.SetOutputLimits(-maxCorrect, maxCorrect);
   piBR.SetOutputLimits(-maxCorrect, maxCorrect);
@@ -233,17 +224,20 @@ void InitStuff() {
 }
 
 void CCUpdatePWM() {
-  for(int i=0;i<4;i++) {
+  // Changed for test from 4
+  for(int i=0;i<1;i++) {
     setIPI[i] = setI[i];
     currentPI[i] = current[i];
     setV[i] = resistance[i] * setI[i];
     pwmOffset[i] = int(setV[i] / battVoltage * 255.0); // Feedforward (FF) control
   }
+
   piFR.Compute();
-  piFL.Compute();
-  piBR.Compute();
-  piBL.Compute();
-  for(int i=0;i<4;i++) {
+  // piFL.Compute();
+  // piBR.Compute();
+  // piBL.Compute();
+  // Changed for test was 4
+  for(int i=0;i<1;i++) {
     pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
     if(pwm[i] < 0) {
       pwm[i] = -pwm[i];
@@ -257,42 +251,77 @@ void CCUpdatePWM() {
   }
 }
 
+bool printToFile = false; 
+double last_time = 0; 
+
 void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-PI controller to actuate a PWM accordingly.
   funcTime = micros();
+  //setI[0] = 6 * sin(frequency * 2 * PI * millis() / 1000.0);
   GetCurrent();
   CCUpdatePWM();
   funcTime = micros() - funcTime;
+  last_time = micros()/1.0E6;
+  printToFile = true; 
+
+  // Update frequency every 5 seconds
+  static unsigned long lastFrequencyChange = 0;
+  if (millis() - lastFrequencyChange >= 5000) {
+    switch (frequency) {
+      case 1:
+        frequency = 5;
+        break;
+      case 5:
+        frequency = 10;
+        break;
+      case 10:
+        frequency = 15;
+        break;
+      case 15:
+        frequency = 20;
+        break;
+      case 20:
+        frequency = 25;
+        break;
+      case 25:
+        frequency = 28;
+        break;
+      case 28:
+        frequency = 29;
+        break;
+      case 29:
+        frequency = 30;
+        break;
+      case 30:
+        frequency = 31;
+        break;
+      case 31:
+        frequency = 32;
+        break;
+      case 32:
+        frequency = 33;
+        break;
+      case 33:
+        frequency = 34;
+        break;
+      case 34:
+        frequency = 35;
+        break;
+      case 35:
+        frequency = 40;
+        break;
+      case 40:
+        frequency = 45;
+        break;
+      case 45:
+        frequency = 1; // Loop back to 1 Hz
+        break;
+    }
+    lastFrequencyChange = millis();
+  }
 }
 
-void SineInput() {
-  // for(i=0;i<4;i++) {
-  //   setI[i] = float(int(waveformsTable[0][sineCount+i*5]-1000))/800;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
-  // }
-  // // setI[0] = int(waveformsTable[0][sineCount]);
-  // // setI[1] = int(waveformsTable[0][sineCount+5]);
-  // // setI[2] = int(waveformsTable[0][sineCount+10]);
-  // // setI[3] = int(waveformsTable[0][sineCount+15]);
-  // sineCount++;
-  // if((sineCount+i*5) >= maxSamplesNum) {sineCount = 0;}
-
-  // for(i=0;i<4;i++) {
-  //   setI[i] = -1*sineCount+i/2;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
-  // }
-  // sineCount++;
-  // if(sineCount>4) {sineCount=0;}
-  setI[0] = -10;
-  setI[1] = 0;
-  setI[2] = 0;
-  setI[3] = 0;
-  // for(int i=0;i<4;i++) {
-  //   desDirec[i] = 0;
-  //   SetDirec(i,desDirec[i]);
-  // }
-}
 
 //------------------------------------------------------------------
 
@@ -311,17 +340,20 @@ void setup() {
   // Initialize Timmer Interupts for 33Hz
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
-  Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
+  Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
+  //Timer4.attachInterrupt(SineInput).start(10000); // Timer for sinusoidal input to actuators
 
 }
 
+double time_capture; 
+float current_capture; 
 void loop() {
 
   GetVoltage();
 
+ analogWrite(mdEnPins[2], 60);
 
-  timeCount = millis();
+  // timeCount = millis();
 
   /*
   // Print out quadrature encoder data (Validation)
@@ -366,18 +398,33 @@ void loop() {
   //   currentFlag = 0;
   // }
 
-  Serial.println("Currents: ");
-  for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+  // Serial.println("Currents: ");
+  // for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+  // // Serial.println("");
+  // // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+  // for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
+  // Serial.print("--");
+  // Serial.print("Voltage: "); Serial.print(battVoltage,2);
+  // Serial.print(", "); Serial.print(funcTime);
+  // Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
   // Serial.println("");
-  // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
-  Serial.print("--");
-  Serial.print("Voltage: "); Serial.print(battVoltage,2);
-  Serial.print(", "); Serial.print(funcTime);
-  Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
-  Serial.println("");
-  currentFlag = 0;
+  // currentFlag = 0;
 
+  if(printToFile){
+    time_capture = last_time;
+    current_capture = current[0];
 
-  delay(100);
+    Serial.print(time_capture, 3);
+    // Serial.print(",");
+    // Serial.print(setI[0], 6);
+    Serial.print(",");
+    Serial.print(current_capture, 4);
+    // Serial.print(",");
+    // Serial.print(battVoltage, 2);
+    Serial.print(",");
+    Serial.print(frequency);
+    Serial.println();
+    printToFile = false;
+  }
 }
+
