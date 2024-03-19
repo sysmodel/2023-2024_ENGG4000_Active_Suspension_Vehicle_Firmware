@@ -46,6 +46,7 @@ long timeCount = millis();
 int sineCount = 0;
 int funcTime = 0;
 int currentFlag = 0;
+uint8_t ina260Addresses[4] = {0x41,0x44,0x45,0x40};
 
 // Motor driver
 uint32_t mdEnPins[4] = {4,5,2,3};
@@ -60,7 +61,7 @@ float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
 float resistance[4] = {0.663*(3/6.2)*(3/2.35)*(3/3.3),0.663,0.663,0.663}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=0, Ki=400, Kd=0;  // specify PID tuning parameters
+double Kp=2, Ki=300, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
@@ -74,14 +75,8 @@ uint8_t quadEncoderFlag = 0;
 uint8_t absEncoderFlag = 0;
 uint8_t resolution = 12;
 // - Define global variable to store abs encoder positions and speeds
-uint16_t absEncCurrentPositionFR; // Front Right
-uint16_t absEncCurrentPositionFL; // Front Left
-uint16_t absEncCurrentPositionBR; // Back Right
-uint16_t absEncCurrentPositionBL; // Back Left
-double absEncCurrentVelocityFR; // Front Right
-double absEncCurrentVelocityFL; // Front Left
-double absEncCurrentVelocityBR; // Back Right
-double absEncCurrentVelocityBL; // Back Left
+uint16_t absEncCurrentPosition[4] = {0,0,0,0}; // array of positions from abs. encoder
+double absEncCurrentVelocity[4] = {0,0,0,0}; // array of velocities from abs. encoder
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
 uint8_t sdoPin[4] = {11, 13, 7, 9};
 uint8_t sckPin[4] = {10, 12, 6, 8};
@@ -89,43 +84,62 @@ uint8_t csPin[4] = {25, 24, 27, 26};
 
 //------------------------------------------------------------------
 
-uint8_t ina260Addresses[4] = {0x41,0x44,0x45,0x40};
-
 struct QuarterCar {
+
   int idx; // will be used to index for the correct pin values
-  float qcSetI;
-  float qcCurr;
-  uint16_t qcEncPos;
-  double qcEncVel;
-  int direc, desDirec;
-  uint8_t sdoPin;
-  uint8_t sckPin;
-  uint8_t csPin;
-
-  Adafruit_INA260 ina260 = Adafruit_INA260();
-  bool inaBegin = ina260.begin(ina260Addresses[idx]);
-
-  void Set(int wheel) {idx = wheel;}
   
-  void GetCurrent() {
-    qcCurr = float(ina260.readCurrent())/1000.0 - offset[idx];
-    if (qcCurr < 0) {
-      direc = 0;
-      qcCurr = 1.0887*qcCurr - 0.1416;
-    } else {
-      direc = 1;
-      qcCurr = 1.0637*qcCurr + 0.1416;
-    }
+  struct AbsEnc {
+    uint16_t Pos;
+    double Vel;
+    uint8_t sdoPin;
+    uint8_t sckPin;
+    uint8_t csPin;
   }
 
+  struct Motor {
+    int Pwm;
+    int DesDirec;
+    uint32_t mdEnPin;
+    uint32_t mdIn1Pin;
+    uint32_t mdIn2Pin;
+  }
+  
+  struct CurrentSens {
+    float Current;
+    int Direc;
+  }
 
+  struct Control {
+    float SetI;
+    int PwmOffset;
+  }
+
+  // void Set(int wheel) {idx = wheel;}
+  
+
+
+
+
+
+  // Adafruit_INA260 ina260 = Adafruit_INA260();
+  // bool inaBegin = ina260.begin(ina260Addresses[idx]);
+
+  // void GetCurrent() {
+  //   qcCurr = float(ina260.readCurrent())/1000.0 - offset[idx];
+  //   if (qcCurr < 0) {
+  //     direc = 0;
+  //     qcCurr = 1.0887*qcCurr - 0.1416;
+  //   } else {
+  //     direc = 1;
+  //     qcCurr = 1.0637*qcCurr + 0.1416;
+  //   }
+  // }
 
   // PID piC(&currentPI[idx], &outPI[idx], &setIPI[idx], Kp, Ki, Kd, DIRECT);
+  // AbsEnc absEncoder(sckPin, csPin, sdoPin, resolution);
+} FRqc, FLqc, BRqc, BLqc;
 
-  AbsEnc absEncoder(sckPin, csPin, sdoPin, resolution);
 
-
-} FR, FL, BR, BL;
 
 //------------------------------------------------------------------
 
@@ -204,16 +218,16 @@ void GetQuadEncoderData() {
 
 void GetAbsEncoderData() {
   // Get the positions from each abs encoder
-  absEncCurrentPositionFR = absEncoderFR.AbsEncPos();
-  absEncCurrentPositionFL = absEncoderFL.AbsEncPos();
-  absEncCurrentPositionBR = absEncoderBR.AbsEncPos();
-  absEncCurrentPositionBL = absEncoderBL.AbsEncPos();
+  absEncCurrentPosition[0] = absEncoderFR.AbsEncPos();
+  absEncCurrentPosition[1] = absEncoderFL.AbsEncPos();
+  absEncCurrentPosition[2] = absEncoderBR.AbsEncPos();
+  absEncCurrentPosition[3] = absEncoderBL.AbsEncPos();
 
   // Get the velocities from each abs encoder
-  absEncCurrentVelocityFR = absEncoderFR.AbsEncVel();
-  absEncCurrentVelocityFL = absEncoderFL.AbsEncVel();
-  absEncCurrentVelocityBR = absEncoderBR.AbsEncVel();
-  absEncCurrentVelocityBL = absEncoderBL.AbsEncVel();
+  absEncCurrentVelocity[0] = absEncoderFR.AbsEncVel();
+  absEncCurrentVelocity[1] = absEncoderFL.AbsEncVel();
+  absEncCurrentVelocity[2] = absEncoderBR.AbsEncVel();
+  absEncCurrentVelocity[3] = absEncoderBL.AbsEncVel();
 
   // Set flag to print this value in the loop()
   absEncoderFlag = 1;
@@ -223,6 +237,12 @@ void InitStuff() {
   // Initialize serial communication at 115200 bps
   Serial.begin(115200);
   
+  // for(i=0;i<4;i++) {
+    
+  // }
+  FRqc.csPin = csPin[0];
+
+
   // Setting pin modes
   pinMode(led, OUTPUT); // for built-in LED, HIGH is on and vice versa
   for(i=0;i<4;i++) {  // pins of motor drivers
