@@ -98,6 +98,9 @@ struct QuarterCar {
   uint16_t qcEncPos;
   double qcEncVel;
   int direc, desDirec;
+  uint8_t sdoPin;
+  uint8_t sckPin;
+  uint8_t csPin;
 
   Adafruit_INA260 ina260 = Adafruit_INA260();
   bool inaBegin = ina260.begin(ina260Addresses[idx]);
@@ -117,9 +120,9 @@ struct QuarterCar {
 
 
 
-  PID piC(&currentPI[idx], &outPI[idx], &setIPI[idx], Kp, Ki, Kd, DIRECT);
+  // PID piC(&currentPI[idx], &outPI[idx], &setIPI[idx], Kp, Ki, Kd, DIRECT);
 
-
+  AbsEnc absEncoder(sckPin, csPin, sdoPin, resolution);
 
 
 } FR, FL, BR, BL;
