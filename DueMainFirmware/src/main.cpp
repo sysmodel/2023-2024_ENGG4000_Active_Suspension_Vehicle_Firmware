@@ -89,6 +89,43 @@ uint8_t csPin[4] = {25, 24, 27, 26};
 
 //------------------------------------------------------------------
 
+uint8_t ina260Addresses[4] = {0x41,0x44,0x45,0x40};
+
+struct QuarterCar {
+  int idx; // will be used to index for the correct pin values
+  float qcSetI;
+  float qcCurr;
+  uint16_t qcEncPos;
+  double qcEncVel;
+  int direc, desDirec;
+
+  Adafruit_INA260 ina260 = Adafruit_INA260();
+  bool inaBegin = ina260.begin(ina260Addresses[idx]);
+
+  void Set(int wheel) {idx = wheel;}
+  
+  void GetCurrent() {
+    qcCurr = float(ina260.readCurrent())/1000.0 - offset[idx];
+    if (qcCurr < 0) {
+      direc = 0;
+      qcCurr = 1.0887*qcCurr - 0.1416;
+    } else {
+      direc = 1;
+      qcCurr = 1.0637*qcCurr + 0.1416;
+    }
+  }
+
+
+
+  PID piC(&currentPI[idx], &outPI[idx], &setIPI[idx], Kp, Ki, Kd, DIRECT);
+
+
+
+
+} FR, FL, BR, BL;
+
+//------------------------------------------------------------------
+
 // Creation of absolute encoder objects; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
 AbsEnc absEncoderFR(sckPin[0], csPin[0], sdoPin[0], resolution);
 AbsEnc absEncoderFL(sckPin[1], csPin[1], sdoPin[1], resolution);
