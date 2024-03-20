@@ -26,6 +26,7 @@
 #include "Adafruit_INA260.h"
 #include "PID_v1.h"
 #include "Waveforms.h"
+#include "DataStructure.h"
 
 //------------------------------------------------------------------
 
@@ -63,9 +64,9 @@ float setI[4] = {0,0,0,0}; // array of stored current setpoints
 float resistance[4] = {0.663*(3/6.2)*(3/2.35)*(3/3.3),0.663,0.663,0.663}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
 double Kp=2, Ki=300, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
-double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
-double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
-double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
+// double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
+// double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
+// double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
 float setV[4] = {0,0,0,0};
 int pwmOffset[4] = {0,0,0,0};
 int pwmCeiling = 120;
@@ -84,70 +85,69 @@ uint8_t csPin[4] = {25, 24, 27, 26};
 
 //------------------------------------------------------------------
 
-struct QuarterCar {
+// struct QuarterCar {
 
-  int idx; // will be used to index for the correct pin values
+//   int idx; // will be used to index for the correct pin values
   
-  struct AbsEnc {
-    uint16_t Pos;
-    double Vel;
-    uint8_t sdoPin;
-    uint8_t sckPin;
-    uint8_t csPin;
-  }
+//   struct AbsEnc {
+//     uint16_t Pos;
+//     double Vel;
+//     uint8_t sdoPin;
+//     uint8_t sckPin;
+//     uint8_t csPin;
+//   };
 
-  struct Motor {
-    int Pwm;
-    int DesDirec;
-    uint32_t mdEnPin;
-    uint32_t mdIn1Pin;
-    uint32_t mdIn2Pin;
-  }
+//   struct Motor {
+//     int Pwm;
+//     int DesDirec;
+//     uint32_t mdEnPin;
+//     uint32_t mdIn1Pin;
+//     uint32_t mdIn2Pin;
+//   };
   
-  struct CurrentSens {
-    float Current;
-    int Direc;
-  }
+//   struct CurrentSens {
+//     float Current;
+//     int Direc;
+//   };
 
-  struct Control {
-    float SetI;
-    int PwmOffset;
-  }
+//   struct Control {
+//     float SetI;
+//     int PwmOffset;
+//   };
 
-  // void Set(int wheel) {idx = wheel;}
+//   // void Set(int wheel) {idx = wheel;}
   
 
 
 
 
 
-  // Adafruit_INA260 ina260 = Adafruit_INA260();
-  // bool inaBegin = ina260.begin(ina260Addresses[idx]);
+//   // Adafruit_INA260 ina260 = Adafruit_INA260();
+//   // bool inaBegin = ina260.begin(ina260Addresses[idx]);
 
-  // void GetCurrent() {
-  //   qcCurr = float(ina260.readCurrent())/1000.0 - offset[idx];
-  //   if (qcCurr < 0) {
-  //     direc = 0;
-  //     qcCurr = 1.0887*qcCurr - 0.1416;
-  //   } else {
-  //     direc = 1;
-  //     qcCurr = 1.0637*qcCurr + 0.1416;
-  //   }
-  // }
+//   // void GetCurrent() {
+//   //   qcCurr = float(ina260.readCurrent())/1000.0 - offset[idx];
+//   //   if (qcCurr < 0) {
+//   //     direc = 0;
+//   //     qcCurr = 1.0887*qcCurr - 0.1416;
+//   //   } else {
+//   //     direc = 1;
+//   //     qcCurr = 1.0637*qcCurr + 0.1416;
+//   //   }
+//   // }
 
-  // PID piC(&currentPI[idx], &outPI[idx], &setIPI[idx], Kp, Ki, Kd, DIRECT);
-  // AbsEnc absEncoder(sckPin, csPin, sdoPin, resolution);
-} FRqc, FLqc, BRqc, BLqc;
-
+//   // PID piC(&currentPI[idx], &outPI[idx], &setIPI[idx], Kp, Ki, Kd, DIRECT);
+//   // AbsEnc absEncoder(sckPin, csPin, sdoPin, resolution);
+// } FRqc, FLqc, BRqc, BLqc;
 
 
 //------------------------------------------------------------------
 
 // Creation of absolute encoder objects; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
-AbsEnc absEncoderFR(sckPin[0], csPin[0], sdoPin[0], resolution);
-AbsEnc absEncoderFL(sckPin[1], csPin[1], sdoPin[1], resolution);
-AbsEnc absEncoderBR(sckPin[2], csPin[2], sdoPin[2], resolution);
-AbsEnc absEncoderBL(sckPin[3], csPin[3], sdoPin[3], resolution);
+AbsEnc absEncoderFR(FRqc.AbsEnc.sckPin, FRqc.AbsEnc.csPin, FRqc.AbsEnc.sdoPin, resolution);
+AbsEnc absEncoderFL(FLqc.AbsEnc.sckPin, FLqc.AbsEnc.csPin, FLqc.AbsEnc.sdoPin, resolution);
+AbsEnc absEncoderBR(BRqc.AbsEnc.sckPin, BRqc.AbsEnc.csPin, BRqc.AbsEnc.sdoPin, resolution);
+AbsEnc absEncoderBL(BLqc.AbsEnc.sckPin, BLqc.AbsEnc.csPin, BLqc.AbsEnc.sdoPin, resolution);
 
 // Creation of INA260 current sensor objects
 Adafruit_INA260 ina260FR = Adafruit_INA260();
@@ -156,10 +156,10 @@ Adafruit_INA260 ina260BR = Adafruit_INA260();
 Adafruit_INA260 ina260BL = Adafruit_INA260();
 
 // Creating of PID objects
-PID piFR(&currentPI[0], &outPI[0], &setIPI[0], Kp, Ki, Kd, DIRECT);
-PID piFL(&currentPI[1], &outPI[1], &setIPI[1], Kp, Ki, Kd, DIRECT);
-PID piBR(&currentPI[2], &outPI[2], &setIPI[2], Kp, Ki, Kd, DIRECT);
-PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
+PID piFR(&FRqc.Control.currentPI, &FRqc.Control.outPI, &FRqc.Control.setIPI, Kp, Ki, Kd, DIRECT);
+PID piFL(&FLqc.Control.currentPI, &FLqc.Control.outPI, &FLqc.Control.setIPI, Kp, Ki, Kd, DIRECT);
+PID piBR(&BRqc.Control.currentPI, &BRqc.Control.outPI, &BRqc.Control.setIPI, Kp, Ki, Kd, DIRECT);
+PID piBL(&BLqc.Control.currentPI, &BLqc.Control.outPI, &BLqc.Control.setIPI, Kp, Ki, Kd, DIRECT);
 
 //------------------------------------------------------------------
 
@@ -192,7 +192,7 @@ void GetCurrent() {
     if (current[i] < 0) {
       // current[i] = -current[i];
       direc[i] = 0;
-      current[i] = 1.0637*current[i] - 0.1416;
+      current[i] = 1.0887*current[i];
     } else {
       direc[i] = 1;
       current[i] = 1.0637*current[i] + 0.1416;
@@ -240,7 +240,7 @@ void InitStuff() {
   // for(i=0;i<4;i++) {
     
   // }
-  FRqc.csPin = csPin[0];
+  // FRqc.csPin = csPin[0];
 
 
   // Setting pin modes
@@ -392,20 +392,20 @@ void loop() {
   }
   */
 
-  // Print out absolute encoder data (Validation)
-  if (absEncoderFlag == 1) {
-    Serial.print("FR Abs Encoder Position: ");
-    Serial.print(absEncCurrentPositionFR);
-    Serial.print(" FR Abs Encoder Velocity: ");
-    Serial.println(absEncCurrentVelocityFR);
-    absEncoderFlag = 0;
+  // // Print out absolute encoder data (Validation)
+  // if (absEncoderFlag == 1) {
+  //   Serial.print("FR Abs Encoder Position: ");
+  //   Serial.print(absEncCurrentPositionFR);
+  //   Serial.print(" FR Abs Encoder Velocity: ");
+  //   Serial.println(absEncCurrentVelocityFR);
+  //   absEncoderFlag = 0;
 
 
-    // Independent of the abs. encoders but should print at the same time
-    Serial.print("Currents: ");
-    for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
-    Serial.println("");
-  }
+  //   // Independent of the abs. encoders but should print at the same time
+  //   Serial.print("Currents: ");
+  //   for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
+  //   Serial.println("");
+  // }
 
   // Serial.print("Currents: ");
   // for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
