@@ -33,20 +33,21 @@ uint32_t mdIn2Pins[4] = {50,52,46,48};
 int pwm[4] = {0,0,0,0};
 bool direc[4] = {0,0,0,0}; // motor action directions; 1 is up, 0 is down
 bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is down
+bool direcChange[4] = {0,0,0,0};
 
 // Jetson communication
 float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
 float resistance[4] = {0.663*(3/6.2)*(3/2.35)*(3/3.3),0.663,0.663,0.663}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=0, Ki=0, Kd=0;  // specify PID tuning parameters
+double Kp=0, Ki=400, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
 double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
 float setV[4] = {0,0,0,0};
 int pwmOffset[4] = {0,0,0,0};
-int pwmCeiling = 120;
+int pwmCeiling = 180;
 
 // Encoders
 uint8_t quadEncoderFlag = 0;
@@ -92,9 +93,11 @@ PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 //------------------------------------------------------------------
 
 void SetDirec(int wheel, bool dir) {
+  digitalWrite(mdIn1Pins[wheel], HIGH);
+  digitalWrite(mdIn2Pins[wheel], HIGH);
   if (dir == 1) {
-    digitalWrite(mdIn1Pins[wheel], LOW);
     digitalWrite(mdIn2Pins[wheel], HIGH);
+    digitalWrite(mdIn1Pins[wheel], LOW);
   } else if (dir == 0) {
     digitalWrite(mdIn1Pins[wheel], HIGH);
     digitalWrite(mdIn2Pins[wheel], LOW);
@@ -102,7 +105,7 @@ void SetDirec(int wheel, bool dir) {
 }
 
 void GetCurrent() {
-  // Changed for test was 4
+
   for(int i=0;i<1;i++) {
     switch(i) {
       case 0:
@@ -121,12 +124,12 @@ void GetCurrent() {
     
     current[i] = 1.0887*current[i];
 
-    if (current[i] < 0) {
-      direc[i] = 0;
+    // if (current[i] < 0) {
+    //   direc[i] = 0;
       
-    } else {
-      direc[i] = 1;
-    }
+    // } else {
+    //   direc[i] = 1;
+    // }
   }
   currentFlag = 1;
 }
@@ -245,20 +248,24 @@ void CCUpdatePWM() {
     } else {
       desDirec[i] = 1;
     }
-    SetDirec(i,desDirec[i]);
+    if (direc[i] != desDirec[i]) {SetDirec(i,desDirec[i]); direc[i] = desDirec[i];}
+    // SetDirec(i,desDirec[i]);
     if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
     analogWrite(mdEnPins[i], pwm[i]);
+    }
   }
-}
+
 
 bool printToFile = false; 
-double last_time = 0; 
+double last_time = 0;
+int amplitude = 5;
 
 void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-PI controller to actuate a PWM accordingly.
   funcTime = micros();
-  //setI[0] = 6 * sin(frequency * 2 * PI * millis() / 1000.0);
+  setI[0] = amplitude * sin(frequency * 2 * PI * millis() / 1000.0);
+  // setI[0] = -amplitude;
   GetCurrent();
   CCUpdatePWM();
   funcTime = micros() - funcTime;
@@ -267,59 +274,70 @@ void ActuateAction() {
 
   // Update frequency every 5 seconds
   static unsigned long lastFrequencyChange = 0;
-  if (millis() - lastFrequencyChange >= 5000) {
-    switch (frequency) {
-      case 1:
-        frequency = 5;
-        break;
-      case 5:
-        frequency = 10;
-        break;
-      case 10:
-        frequency = 15;
-        break;
-      case 15:
-        frequency = 20;
-        break;
-      case 20:
-        frequency = 25;
-        break;
-      case 25:
-        frequency = 28;
-        break;
-      case 28:
-        frequency = 29;
-        break;
-      case 29:
-        frequency = 30;
-        break;
-      case 30:
-        frequency = 31;
-        break;
-      case 31:
-        frequency = 32;
-        break;
-      case 32:
-        frequency = 33;
-        break;
-      case 33:
-        frequency = 34;
-        break;
-      case 34:
-        frequency = 35;
-        break;
-      case 35:
-        frequency = 40;
-        break;
-      case 40:
-        frequency = 45;
-        break;
-      case 45:
-        frequency = 1; // Loop back to 1 Hz
-        break;
-    }
-    lastFrequencyChange = millis();
-  }
+  // if (millis() - lastFrequencyChange >= 5000) {
+  //   switch (frequency) {
+  //     case 1:
+  //       frequency = 5;
+  //       break;
+  //     case 5:
+  //       frequency = 10;
+  //       break;
+  //     case 10:
+  //       frequency = 15;
+  //       break;
+  //     case 15:
+  //       frequency = 20;
+  //       break;
+  //     case 20:
+  //       frequency = 25;
+  //       break;
+  //     case 25:
+  //       frequency = 28;
+  //       break;
+  //     case 28:
+  //       frequency = 29;
+  //       break;
+  //     case 29:
+  //       frequency = 30;
+  //       break;
+  //     case 30:
+  //       frequency = 31;
+  //       break;
+  //     case 31:
+  //       frequency = 32;
+  //       break;
+  //     case 32:
+  //       frequency = 33;
+  //       break;
+  //     case 33:
+  //       frequency = 34;
+  //       break;
+  //     case 34:
+  //       frequency = 35;
+  //       break;
+  //     case 35:
+  //       frequency = 40;
+  //       break;
+  //     case 40:
+  //       frequency = 45;
+  //       break;
+  //     case 45:
+  //       frequency = 1; // Loop back to 1 Hz
+  //       break;
+  //   }
+  //   lastFrequencyChange = millis();
+  // }
+}
+
+int timedInputCount = 1;
+
+void TimedInput() {
+  // frequency = 5 * timedInputCount;
+  // if (timedInputCount > 12) {timedInputCount = 0;}
+  frequency = 30;
+
+  amplitude += 2;
+  if (amplitude > 7) {amplitude = 5;}
 }
 
 
@@ -341,17 +359,17 @@ void setup() {
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
-  //Timer4.attachInterrupt(SineInput).start(10000); // Timer for sinusoidal input to actuators
+  Timer4.attachInterrupt(TimedInput).start(3000000); // Timer for input to actuators
 
 }
 
 double time_capture; 
-float current_capture; 
+float current_capture;
 void loop() {
 
   GetVoltage();
 
- analogWrite(mdEnPins[2], 60);
+  // analogWrite(mdEnPins[0], 60);
 
   // timeCount = millis();
 
@@ -410,6 +428,7 @@ void loop() {
   // Serial.println("");
   // currentFlag = 0;
 
+
   if(printToFile){
     time_capture = last_time;
     current_capture = current[0];
@@ -423,8 +442,13 @@ void loop() {
     // Serial.print(battVoltage, 2);
     Serial.print(",");
     Serial.print(frequency);
+    Serial.print(",");
+    Serial.print(pwm[0]);
+    Serial.print(",");
+    Serial.print(setI[0]);
     Serial.println();
     printToFile = false;
   }
+  // delay(10);
 }
 
