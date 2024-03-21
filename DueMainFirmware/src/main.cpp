@@ -67,9 +67,6 @@ uint8_t sdoPin[4] = {11, 13, 7, 9};
 uint8_t sckPin[4] = {10, 12, 6, 8};
 uint8_t csPin[4] = {25, 24, 27, 26};
 
-// Frequency testing
-uint8_t frequency = 1;
-
 //------------------------------------------------------------------
 
 // Creation of absolute encoder objects; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
@@ -202,14 +199,14 @@ void InitStuff() {
   ina260FL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260BR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260BL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
-  ina260FR.setAveragingCount(INA260_COUNT_16);
-  ina260FL.setAveragingCount(INA260_COUNT_16);
-  ina260BR.setAveragingCount(INA260_COUNT_16);
-  ina260BL.setAveragingCount(INA260_COUNT_16);
-  ina260FR.setCurrentConversionTime(INA260_TIME_140_us);
-  ina260FL.setCurrentConversionTime(INA260_TIME_140_us);
-  ina260BR.setCurrentConversionTime(INA260_TIME_140_us);
-  ina260BL.setCurrentConversionTime(INA260_TIME_140_us);
+  // ina260FR.setAveragingCount(INA260_COUNT_16);
+  // ina260FL.setAveragingCount(INA260_COUNT_16);
+  // ina260BR.setAveragingCount(INA260_COUNT_16);
+  // ina260BL.setAveragingCount(INA260_COUNT_16);
+  ina260FR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260FL.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BL.setCurrentConversionTime(INA260_TIME_2_116_ms);
 
   // Set PID mode, sampling time, and output limits
   piFR.SetMode(AUTOMATIC);
@@ -252,10 +249,11 @@ void CCUpdatePWM() {
     // SetDirec(i,desDirec[i]);
     if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
     analogWrite(mdEnPins[i], pwm[i]);
-    }
   }
+}
 
-
+// Frequency testing
+uint8_t frequency = 1;
 bool printToFile = false; 
 double last_time = 0;
 int amplitude = 5;
@@ -264,7 +262,7 @@ void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-PI controller to actuate a PWM accordingly.
   funcTime = micros();
-  setI[0] = amplitude * sin(frequency * 2 * PI * millis() / 1000.0);
+  setI[0] = amplitude * cos(frequency * 2 * PI * millis() / 1000.0);
   // setI[0] = -amplitude;
   GetCurrent();
   CCUpdatePWM();
@@ -329,15 +327,25 @@ void ActuateAction() {
   // }
 }
 
-int timedInputCount = 1;
+int timedInputCount = 0;
+int freqs[3] = {5, 0, 15};
+int amps[3] = {7, -9, 4};
 
 void TimedInput() {
   // frequency = 5 * timedInputCount;
   // if (timedInputCount > 12) {timedInputCount = 0;}
-  frequency = 30;
 
-  amplitude += 2;
-  if (amplitude > 7) {amplitude = 5;}
+
+  frequency = freqs[timedInputCount];
+  amplitude = amps[timedInputCount];
+  timedInputCount++;
+  if (timedInputCount > 2) {timedInputCount = 0;}
+
+
+  // frequency = 30;
+
+  // amplitude += 2;
+  // if (amplitude > 7) {amplitude = 5;}
 }
 
 
@@ -359,7 +367,7 @@ void setup() {
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
-  Timer4.attachInterrupt(TimedInput).start(3000000); // Timer for input to actuators
+  Timer4.attachInterrupt(TimedInput).start(2000000); // Timer for input to actuators
 
 }
 
