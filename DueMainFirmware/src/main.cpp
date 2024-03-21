@@ -256,8 +256,8 @@ void CCUpdatePWM() {
 uint8_t frequency = 15;
 bool printToFile = false; 
 double last_time = 0;
-int amplitude = 4;
-float phase[4] = {0,0,0,0};
+int amplitude = 6;
+float phase[4] = {0,0.25,0.75,0.5};
 int mod;
 
 void ActuateAction() {
@@ -265,15 +265,14 @@ void ActuateAction() {
   // ... compute the FF-PI controller to actuate a PWM accordingly.
   funcTime = micros();
 
-  mod = funcTime % (2.0E6);
-  
+  // mod = funcTime % int(2.0E6);
   for(i=0;i<4;i++) {
-    // setI[i] = amplitude * sin(3 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
-    if (mod > 1.6E6) {
-      setI[i] = amplitude;
-    } else {
-      setI[i] = -amplitude;
-    }
+    setI[i] = amplitude * sin(0.75 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+    // if (mod > 1.6E6) {
+    //   setI[i] = amplitude;
+    // } else {
+    //   setI[i] = -amplitude;
+    // }
   }
 
   GetCurrent();
@@ -311,6 +310,20 @@ void TimedInput() {
 
   // amplitude += 2;
   // if (amplitude > 7) {amplitude = 5;}
+
+  for(i=0;i<2;i++) {
+    if (timedInputCount < 14) {
+      setI[i] = 0;
+    // } else if (timedInputCount < 17) {
+    //   setI[i] = -16;
+    // } else {
+    //   setI[i] = 10;
+    }
+  }
+
+
+  timedInputCount++;
+  if (timedInputCount>19) {timedInputCount = 0;}
 }
 
 
@@ -332,7 +345,7 @@ void setup() {
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(5000); // Timer for ActuateAction function
-  Timer4.attachInterrupt(TimedInput).start(2000000); // Timer for input to actuators
+  // Timer4.attachInterrupt(TimedInput).start(100000); // Timer for input to actuators
 
 }
 
