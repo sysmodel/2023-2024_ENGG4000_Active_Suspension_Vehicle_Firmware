@@ -36,7 +36,7 @@ bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is 
 bool direcChange[4] = {0,0,0,0};
 
 // Jetson communication
-float setI[4] = {0,0,0,-6}; // array of stored current setpoints
+float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
 float resistance[4] = {0.372,0.301,0.310,0.325}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
@@ -238,7 +238,7 @@ void CCUpdatePWM() {
   piBL.Compute();
   // Changed for test was 4
   for(int i=0;i<4;i++) {
-    pwm[i] = pwmOffset[i];// + int(outPI[i]); // FF + PI control
+    pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
     if(pwm[i] < 0) {
       pwm[i] = -pwm[i];
       desDirec[i] = 0;
@@ -256,14 +256,26 @@ void CCUpdatePWM() {
 uint8_t frequency = 15;
 bool printToFile = false; 
 double last_time = 0;
-int amplitude = 6;
+int amplitude = 4;
+float phase[4] = {0,0,0,0};
+int mod;
 
 void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-PI controller to actuate a PWM accordingly.
   funcTime = micros();
-  // setI[0] = 5 * cos(6 * 2 * PI * millis() / 1000.0 + 0.5) + 5 * cos(9 * 2 * PI * millis() / 1000.0);
-  // setI[2] = -amplitude;
+
+  mod = funcTime % (2.0E6);
+  
+  for(i=0;i<4;i++) {
+    // setI[i] = amplitude * sin(3 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+    if (mod > 1.6E6) {
+      setI[i] = amplitude;
+    } else {
+      setI[i] = -amplitude;
+    }
+  }
+
   GetCurrent();
   CCUpdatePWM();
   funcTime = micros() - funcTime;
@@ -274,6 +286,7 @@ void ActuateAction() {
 int timedInputCount = 0;
 int freqs[3] = {5, 0, 15};
 int amps[3] = {7, -9, 4};
+// int mod[4] = {0,0,0,0};
 
 void TimedInput() {
   // frequency = 5 * timedInputCount;
@@ -282,11 +295,17 @@ void TimedInput() {
 
   // frequency = freqs[timedInputCount];
   // amplitude = amps[timedInputCount];
-  frequency = 15;
-  amplitude = 5;
-  timedInputCount++;
-  if (timedInputCount > 2) {timedInputCount = 0;}
+  // frequency = 15;
+  // amplitude = 5;
+  // timedInputCount++;
+  // if (timedInputCount > 2) {timedInputCount = 0;}
 
+  // mod = funcTime%
+
+  // for(i=0;i<4;i++) {
+  //   setI[i] = amplitude * sin(3 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+  // }
+  
 
   // frequency = 30;
 
@@ -313,7 +332,7 @@ void setup() {
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(5000); // Timer for ActuateAction function
-  // Timer4.attachInterrupt(TimedInput).start(2000000); // Timer for input to actuators
+  Timer4.attachInterrupt(TimedInput).start(2000000); // Timer for input to actuators
 
 }
 
@@ -387,17 +406,17 @@ void loop() {
     time_capture = last_time;
     current_capture = current[3];
 
-    Serial.print(time_capture, 3);
+    // Serial.print(time_capture, 3);
     // Serial.print(",");
     // Serial.print(setI[0], 6);
-    Serial.print(",");
+    // Serial.print(",");
     Serial.print(current_capture, 4);
     // Serial.print(",");
     // Serial.print(battVoltage, 2);
     Serial.print(",");
     Serial.print(battVoltage);
     Serial.print(",");
-    Serial.print(pwm[3]);
+    Serial.print(funcTime);
     Serial.print(",");
     Serial.print(setI[3]);
     Serial.println();
