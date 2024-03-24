@@ -26,6 +26,7 @@
 #include "Adafruit_INA260.h"
 #include "PID_v1.h"
 #include "Waveforms.h"
+#include "SafetyStop.h"
 
 //------------------------------------------------------------------
 
@@ -33,6 +34,8 @@
 #define steerPotPin A4
 #define battCell1Pin A3
 #define battCell2Pin A2
+#define STOP_SWITCH_PIN_OUT 30
+#define STOP_SWITCH_PIN_IN 31
 
 //------------------------------------------------------------------
 
@@ -59,7 +62,7 @@ bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is 
 float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
-float resistance[4] = {0.663*(3/6.2)*(3/2.35)*(3/3.3),0.663,0.663,0.663}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
+float resistance[4] = {0.372,0.301,0.310,0.325}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
 double Kp=0, Ki=400, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
@@ -74,18 +77,17 @@ uint8_t quadEncoderFlag = 0;
 uint8_t absEncoderFlag = 0;
 uint8_t resolution = 12;
 // - Define global variable to store abs encoder positions and speeds
-uint16_t absEncCurrentPositionFR; // Front Right
-uint16_t absEncCurrentPositionFL; // Front Left
-uint16_t absEncCurrentPositionBR; // Back Right
-uint16_t absEncCurrentPositionBL; // Back Left
-double absEncCurrentVelocityFR; // Front Right
-double absEncCurrentVelocityFL; // Front Left
-double absEncCurrentVelocityBR; // Back Right
-double absEncCurrentVelocityBL; // Back Left
+uint16_t absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
+double absEncCurrentVelocity[4] = {0,0,0,0}; // array of absolute encoder velocities
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
 uint8_t sdoPin[4] = {11, 13, 7, 9};
 uint8_t sckPin[4] = {10, 12, 6, 8};
 uint8_t csPin[4] = {25, 24, 27, 26};
+
+// Safety stop
+int stopCondition = 0;
+int lastStopCondition = 0;
+bool switchStatus = false;
 
 //------------------------------------------------------------------
 
@@ -110,10 +112,12 @@ PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 //------------------------------------------------------------------
 
 void SetDirec(int wheel, bool dir) {
-  if (dir == 1) {
-    digitalWrite(mdIn1Pins[wheel], LOW);
+  digitalWrite(mdIn1Pins[wheel], HIGH);
+  digitalWrite(mdIn2Pins[wheel], HIGH);
+  if (dir == 1) { // car up
     digitalWrite(mdIn2Pins[wheel], HIGH);
-  } else if (dir == 0) {
+    digitalWrite(mdIn1Pins[wheel], LOW);
+  } else if (dir == 0) { // car down
     digitalWrite(mdIn1Pins[wheel], HIGH);
     digitalWrite(mdIn2Pins[wheel], LOW);
   }
@@ -123,27 +127,19 @@ void GetCurrent() {
   for(int i=0;i<4;i++) {
     switch(i) {
       case 0:
-        current[i] = float(ina260FR.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260FR.readCurrent() - offset[i])/1000.0;
         break;
       case 1:
-        current[i] = float(ina260FL.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260FL.readCurrent() - offset[i])/1000.0;
         break;
       case 2:
-        current[i] = float(ina260BR.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260BR.readCurrent() - offset[i])/1000.0;
         break;
       case 3:
-        current[i] = float(ina260BL.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260BL.readCurrent() - offset[i])/1000.0;
         break;
     }
-    if (current[i] < 0) {
-      // current[i] = -current[i];
-      direc[i] = 0;
-      current[i] = 1.0637*current[i] - 0.1416;
-    } else {
-      direc[i] = 1;
-      current[i] = 1.0637*current[i] + 0.1416;
-    }
-    // current[i] = 1.0637*current[i] + 0.1416;
+    current[i] = 1.0887*current[i];
   }
   currentFlag = 1;
 }
@@ -164,16 +160,16 @@ void GetQuadEncoderData() {
 
 void GetAbsEncoderData() {
   // Get the positions from each abs encoder
-  absEncCurrentPositionFR = absEncoderFR.AbsEncPos();
-  absEncCurrentPositionFL = absEncoderFL.AbsEncPos();
-  absEncCurrentPositionBR = absEncoderBR.AbsEncPos();
-  absEncCurrentPositionBL = absEncoderBL.AbsEncPos();
+  absEncCurrentPosition[0] = absEncoderFR.AbsEncPos();
+  absEncCurrentPosition[1] = absEncoderFL.AbsEncPos();
+  absEncCurrentPosition[2] = absEncoderBR.AbsEncPos();
+  absEncCurrentPosition[3] = absEncoderBL.AbsEncPos();
 
   // Get the velocities from each abs encoder
-  absEncCurrentVelocityFR = absEncoderFR.AbsEncVel();
-  absEncCurrentVelocityFL = absEncoderFL.AbsEncVel();
-  absEncCurrentVelocityBR = absEncoderBR.AbsEncVel();
-  absEncCurrentVelocityBL = absEncoderBL.AbsEncVel();
+  absEncCurrentVelocity[0] = absEncoderFR.AbsEncVel();
+  absEncCurrentVelocity[1] = absEncoderFL.AbsEncVel();
+  absEncCurrentVelocity[2] = absEncoderBR.AbsEncVel();
+  absEncCurrentVelocity[3] = absEncoderBL.AbsEncVel();
 
   // Set flag to print this value in the loop()
   absEncoderFlag = 1;
@@ -193,6 +189,9 @@ void InitStuff() {
   pinMode(steerPotPin, INPUT);  // steering potentiometer pin
   pinMode(battCell1Pin, INPUT); // pin of voltage sensor measuring battery cell #1
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
+  pinMode(STOP_SWITCH_PIN_OUT, OUTPUT); // high pin will passed/stopped by switch
+  pinMode(STOP_SWITCH_PIN_IN, INPUT); // input pin to read switch output
+  digitalWrite(STOP_SWITCH_PIN_OUT, HIGH);
 
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
@@ -212,20 +211,24 @@ void InitStuff() {
     // while (1);
   }
   Serial.println("Found INA260 chip");
-  ina260FR.setAveragingCount(INA260_COUNT_4);
-  ina260FL.setAveragingCount(INA260_COUNT_4);
-  ina260BR.setAveragingCount(INA260_COUNT_4);
-  ina260BL.setAveragingCount(INA260_COUNT_4);
+  ina260FR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260FL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260BR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260BL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260FR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260FL.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BL.setCurrentConversionTime(INA260_TIME_2_116_ms);
 
   // Set PID mode, sampling time, and output limits
   piFR.SetMode(AUTOMATIC);
   piFL.SetMode(AUTOMATIC);
   piBR.SetMode(AUTOMATIC);
   piBL.SetMode(AUTOMATIC);
-  piFR.SetSampleTime(10);
-  piFL.SetSampleTime(10);
-  piBR.SetSampleTime(10);
-  piBL.SetSampleTime(10);
+  piFR.SetSampleTime(3);
+  piFL.SetSampleTime(3);
+  piBR.SetSampleTime(3);
+  piBL.SetSampleTime(3);
   piFR.SetOutputLimits(-maxCorrect, maxCorrect);
   piFL.SetOutputLimits(-maxCorrect, maxCorrect);
   piBR.SetOutputLimits(-maxCorrect, maxCorrect);
@@ -251,7 +254,7 @@ void CCUpdatePWM() {
     } else {
       desDirec[i] = 1;
     }
-    SetDirec(i,desDirec[i]);
+    if (direc[i] != desDirec[i]) {SetDirec(i,desDirec[i]); direc[i] = desDirec[i];}
     if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
     analogWrite(mdEnPins[i], pwm[i]);
   }
@@ -259,11 +262,13 @@ void CCUpdatePWM() {
 
 void ActuateAction() {
   // This function calls on independent functions to read the current and ...
-  // ... compute the FF-PI controller to actuate a PWM accordingly.
-  funcTime = micros();
-  GetCurrent();
-  CCUpdatePWM();
-  funcTime = micros() - funcTime;
+  // ... compute the FF-I controller to actuate a PWM accordingly.
+  if (stopCondition == 0) {
+    funcTime = micros();
+    GetCurrent();
+    CCUpdatePWM();
+    funcTime = micros() - funcTime;
+  }
 }
 
 void SineInput() {
@@ -294,6 +299,15 @@ void SineInput() {
   // }
 }
 
+void CheckStop() {
+  if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
+    switchStatus = true;
+  } else {
+    switchStatus = false;
+  }
+  switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), &(absEncCurrentPosition[0]), switchStatus);
+}
+
 //------------------------------------------------------------------
 
 void setup() {
@@ -311,73 +325,96 @@ void setup() {
   // Initialize Timmer Interupts for 33Hz
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
-  Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
-
+  Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
+  // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
+  Timer5.attachInterrupt(CheckStop).start(1000000);
 }
 
 void loop() {
-
-  GetVoltage();
-
-
-  timeCount = millis();
-
-  /*
-  // Print out quadrature encoder data (Validation)
-  if (quadEncoderFlag == 1) {
-    Serial.print("Quad Encoder Velocity (rad/s): ");
-    Serial.println(quadEncoderVel);
-    quadEncoderFlag = 0;
-  }
-  */
-
-  // Print out absolute encoder data (Validation)
-  if (absEncoderFlag == 1) {
-    Serial.print("FR Abs Encoder Position: ");
-    Serial.print(absEncCurrentPositionFR);
-    Serial.print(" FR Abs Encoder Velocity: ");
-    Serial.println(absEncCurrentVelocityFR);
-    absEncoderFlag = 0;
+  if (stopCondition == 0) {
+    GetVoltage();
 
 
-    // Independent of the abs. encoders but should print at the same time
-    Serial.print("Currents: ");
-    for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
+    timeCount = millis();
+
+    /*
+    // Print out quadrature encoder data (Validation)
+    if (quadEncoderFlag == 1) {
+      Serial.print("Quad Encoder Velocity (rad/s): ");
+      Serial.println(quadEncoderVel);
+      quadEncoderFlag = 0;
+    }
+    */
+
+    // Print out absolute encoder data (Validation)
+    if (absEncoderFlag == 1) {
+      Serial.print("FR Abs Encoder Position: ");
+      Serial.print(absEncCurrentPosition[0]);
+      Serial.print(" FR Abs Encoder Velocity: ");
+      Serial.println(absEncCurrentVelocity[0]);
+      absEncoderFlag = 0;
+
+
+      // Independent of the abs. encoders but should print at the same time
+      Serial.print("Currents: ");
+      for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
+      Serial.println("");
+    }
+
+    // Serial.print("Currents: ");
+    // for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+    // Serial.println("");
+    // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+    // Serial.println("");
+    // Serial.print("Voltage: "); Serial.println(battVoltage,2);
+
+    // if(currentFlag == 1) {
+    //   Serial.println("Currents: ");
+    //   for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+    //   // Serial.println("");
+    //   // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+    //   for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
+    //   Serial.print("--");
+    //   Serial.print("Voltage: "); Serial.print(battVoltage,2);
+    //   Serial.print(", "); Serial.println(funcTime);
+    //   currentFlag = 0;
+    // }
+
+    Serial.println("Currents: ");
+    for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+    // Serial.println("");
+    // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+    for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
+    Serial.print("--");
+    Serial.print("Voltage: "); Serial.print(battVoltage,2);
+    Serial.print(", "); Serial.print(funcTime);
+    Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
     Serial.println("");
+    currentFlag = 0;
+
+
+    delay(100);
+
+  } else if (stopCondition == MANUAL_STOP) {
+    // do stuff
+    for(i=0;i<4;i++) {
+      analogWrite(pwm[i],0);
+      SetDirec(i,0);
+    }
+    Serial.print("Manual stop condition. Code: ");
+    Serial.print(stopCondition);
+    Serial.println();
+  } else {
+    // do stuff
+    for(i=0;i<4;i++) {
+      analogWrite(pwm[i],0);
+      SetDirec(i,0);
+    }
+    Serial.print("Auto stop condition. Code: ");
+    Serial.print(stopCondition);
+    Serial.println();
+    while(1);
+    // If a limit is crossed, one should check the serial log.
+    // The only way to get out of an auto stop is to restart the program.
   }
-
-  // Serial.print("Currents: ");
-  // for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-  // Serial.println("");
-  // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  // Serial.println("");
-  // Serial.print("Voltage: "); Serial.println(battVoltage,2);
-
-  // if(currentFlag == 1) {
-  //   Serial.println("Currents: ");
-  //   for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-  //   // Serial.println("");
-  //   // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  //   for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
-  //   Serial.print("--");
-  //   Serial.print("Voltage: "); Serial.print(battVoltage,2);
-  //   Serial.print(", "); Serial.println(funcTime);
-  //   currentFlag = 0;
-  // }
-
-  Serial.println("Currents: ");
-  for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-  // Serial.println("");
-  // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
-  Serial.print("--");
-  Serial.print("Voltage: "); Serial.print(battVoltage,2);
-  Serial.print(", "); Serial.print(funcTime);
-  Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
-  Serial.println("");
-  currentFlag = 0;
-
-
-  delay(100);
 }
