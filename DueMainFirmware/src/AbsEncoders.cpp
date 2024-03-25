@@ -50,6 +50,36 @@ void AbsEnc::initAbsEnc()
     pinMode(_sdoPin, INPUT);
 }
 
+// Set encoder positions 
+void AbsEnc::SetEncPositions(int encMinReading, int encMaxReading, bool CW)
+{
+    _encMinReading = encMinReading;
+    _encMaxReading = encMaxReading; 
+    _CW = CW;
+    if (_CW)
+    {
+        if(_encMinReading > encMaxReading)
+        {
+            _switchPoint = (_encMinReading - _encMaxReading) / 2;
+        }
+        else
+        {
+            _switchPoint = (_encMaxReading - 4095 + _encMinReading) / 2;
+        }
+    }
+    else 
+    {
+        if (_encMinReading > encMaxReading)
+        {
+            _switchPoint = (_encMaxReading - 4095 + _encMinReading) / 2;
+        }
+        else 
+        {
+           _switchPoint = (_encMaxReading + _encMinReading) / 2; 
+        }
+    }
+    
+}
 uint16_t AbsEnc::AbsEncPos()
 {
     noInterrupts();
@@ -111,6 +141,55 @@ uint16_t AbsEnc::AbsEncPos()
     return currentPosition;
     
 }
+
+double AbsEnc::GetRackPosition()
+{
+    if (_encMinReading == NULL)
+    {
+        Serial.println("SetEncPositions Not Called!");
+        exit(0);
+    }
+
+    _currentPosition = AbsEncPos();
+
+    if (_CW)
+    {
+        if (_encMaxReading > _encMinReading)
+        {
+            return double(_currentPosition - _encMinReading) * _pulseToDistance;
+        }
+        else 
+        {
+            if (_currentPosition < _switchPoint)
+            {
+                return double((4095.0 - _encMinReading) + _currentPosition) * _pulseToDistance;
+            }
+            else 
+            {
+                return double(_currentPosition - _encMinReading) * _pulseToDistance;
+            }
+        }
+    }
+    else 
+    {
+        if (_encMinReading > _encMaxReading)
+        {
+            return double(_encMinReading - _currentPosition) * _pulseToDistance;
+        }
+        else
+        {
+            if (_currentPosition < _switchPoint)
+            {
+                return double( _encMinReading - _currentPosition) * _pulseToDistance;
+            }
+            else 
+            {
+                return double(_encMinReading + (4095 - _currentPosition)) * _pulseToDistance;
+            }
+        }
+    }
+} 
+
 
 double AbsEnc::AbsEncVel() 
 {
