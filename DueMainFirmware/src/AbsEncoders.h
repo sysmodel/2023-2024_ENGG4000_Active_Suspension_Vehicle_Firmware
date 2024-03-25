@@ -65,6 +65,13 @@ class AbsEnc
         double _switchPoint; 
         uint16_t _currentPosition;
 
+        // Velocity Variables
+        double _absEncoderPreviousPosition = 0;
+        double _absEncoderPosition = 0;
+        unsigned long _absEncoderLastTime = micros();
+        unsigned long _absEncoderTime = 0;
+        double _absEncoderVelocity = 0.0;
+
         // NOP delay function
         void DelayNOP();
         

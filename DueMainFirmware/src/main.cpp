@@ -354,13 +354,13 @@ void loop() {
     // Print out absolute encoder data (Validation)
     if (absEncoderFlag == 1) {
       Serial.print("FR Pos: ");
-      Serial.print(absEncCurrentPosition[0]);
+      Serial.print(absEncCurrentVelocity[0]);
       Serial.print(" FL Pos: ");
-      Serial.print(absEncCurrentPosition[1]);
+      Serial.print(absEncCurrentVelocity[1]);
       Serial.print(" BR Pos: ");
-      Serial.print(absEncCurrentPosition[2]);
+      Serial.print(absEncCurrentVelocity[2]);
       Serial.print(" BL Pos: ");
-      Serial.println(absEncCurrentPosition[3]);
+      Serial.println(absEncCurrentVelocity[3]);
       // absEncPositionFromTopFR
       // Serial.print(" FR Abs Encoder Velocity: ");
       // Serial.println(absEncCurrentVelocityFR);
@@ -405,7 +405,7 @@ void loop() {
     // currentFlag = 0;
 
 
-    delay(250);
+    delay(100);
 
   } else if (stopCondition == MANUAL_STOP) {
     // do stuff
