@@ -60,7 +60,7 @@ void AbsEnc::SetEncPositions(int encMinReading, int encMaxReading, bool CW)
     {
         if(_encMinReading > encMaxReading)
         {
-            _switchPoint = (_encMinReading - _encMaxReading) / 2;
+            _switchPoint = (_encMinReading + _encMaxReading) / 2;
         }
         else
         {
@@ -71,7 +71,7 @@ void AbsEnc::SetEncPositions(int encMinReading, int encMaxReading, bool CW)
     {
         if (_encMinReading > encMaxReading)
         {
-            _switchPoint = (_encMaxReading - 4095 + _encMinReading) / 2;
+            _switchPoint = (_encMinReading - 4095 + _encMaxReading) / 2;
         }
         else 
         {
@@ -193,12 +193,10 @@ double AbsEnc::GetRackPosition()
 
 double AbsEnc::AbsEncVel() 
 {
-    absEncoderPosition = AbsEncPos();
+    absEncoderPosition = GetRackPosition();
     absEncoderTime = micros();
 
     double deltaPosition = absEncoderPosition - absEncoderPreviousPosition;
-
-    /* Need to convert position to anglular or linear result */
 
     double deltaTime = (absEncoderTime - absEncoderLastTime) / 1000;
     double velocity = deltaPosition / deltaTime; 

@@ -52,7 +52,7 @@ class AbsEnc
         double AbsEncVel();
         
 
-    // private:
+    private:
         uint8_t _sckPin;
         uint8_t _csPin;
         uint8_t _sdoPin;

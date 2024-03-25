@@ -80,9 +80,9 @@ uint8_t resolution = 12;
 uint16_t absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
 double absEncCurrentVelocity[4] = {0,0,0,0}; // array of absolute encoder velocities
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
-uint8_t sdoPin[4] = {11, 13, 7, 9};
-uint8_t sckPin[4] = {10, 12, 6, 8};
-uint8_t csPin[4] = {25, 24, 27, 26};
+uint8_t sdoPin[4] = {11, 31, 7, 9};
+uint8_t sckPin[4] = {10, 33, 6, 8};
+uint8_t csPin[4] = {25, 35, 27, 26};
 
 // Safety stop
 int stopCondition = 0;
@@ -160,10 +160,10 @@ void GetQuadEncoderData() {
 
 void GetAbsEncoderData() {
   // Get the positions from each abs encoder
-  absEncCurrentPosition[0] = absEncoderFR.AbsEncPos();
-  absEncCurrentPosition[1] = absEncoderFL.AbsEncPos();
-  absEncCurrentPosition[2] = absEncoderBR.AbsEncPos();
-  absEncCurrentPosition[3] = absEncoderBL.AbsEncPos();
+  absEncCurrentPosition[0] = absEncoderFR.GetRackPosition();
+  absEncCurrentPosition[1] = absEncoderFL.GetRackPosition();
+  absEncCurrentPosition[2] = absEncoderBR.GetRackPosition();
+  absEncCurrentPosition[3] = absEncoderBL.GetRackPosition();
 
   // Get the velocities from each abs encoder
   absEncCurrentVelocity[0] = absEncoderFR.AbsEncVel();
@@ -233,6 +233,11 @@ void InitStuff() {
   piFL.SetOutputLimits(-maxCorrect, maxCorrect);
   piBR.SetOutputLimits(-maxCorrect, maxCorrect);
   piBL.SetOutputLimits(-maxCorrect, maxCorrect);
+
+  absEncoderFR.SetEncPositions(362, 1247, false);
+  absEncoderFL.SetEncPositions(3906, 3196, true);
+  absEncoderBR.SetEncPositions(1648, 544, true);
+  absEncoderBL.SetEncPositions(3901, 810, false);
 }
 
 void CCUpdatePWM() {
@@ -305,7 +310,7 @@ void CheckStop() {
   } else {
     switchStatus = false;
   }
-  switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), &(absEncCurrentPosition[0]), switchStatus);
+  switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), (double*)&(absEncCurrentPosition[0]), switchStatus);
 }
 
 //------------------------------------------------------------------
@@ -324,10 +329,10 @@ void setup() {
 
   // Initialize Timmer Interupts for 33Hz
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
+  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  //Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
   // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
-  Timer5.attachInterrupt(CheckStop).start(1000000);
+  //Timer5.attachInterrupt(CheckStop).start(1000000);
 }
 
 void loop() {
@@ -348,17 +353,24 @@ void loop() {
 
     // Print out absolute encoder data (Validation)
     if (absEncoderFlag == 1) {
-      Serial.print("FR Abs Encoder Position: ");
+      Serial.print("FR Pos: ");
       Serial.print(absEncCurrentPosition[0]);
-      Serial.print(" FR Abs Encoder Velocity: ");
-      Serial.println(absEncCurrentVelocity[0]);
+      Serial.print(" FL Pos: ");
+      Serial.print(absEncCurrentPosition[1]);
+      Serial.print(" BR Pos: ");
+      Serial.print(absEncCurrentPosition[2]);
+      Serial.print(" BL Pos: ");
+      Serial.println(absEncCurrentPosition[3]);
+      // absEncPositionFromTopFR
+      // Serial.print(" FR Abs Encoder Velocity: ");
+      // Serial.println(absEncCurrentVelocityFR);
       absEncoderFlag = 0;
 
 
       // Independent of the abs. encoders but should print at the same time
-      Serial.print("Currents: ");
-      for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
-      Serial.println("");
+      // Serial.print("Currents: ");
+      // for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
+      // Serial.println("");
     }
 
     // Serial.print("Currents: ");
@@ -380,20 +392,20 @@ void loop() {
     //   currentFlag = 0;
     // }
 
-    Serial.println("Currents: ");
-    for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+    // Serial.println("Currents: ");
+    // for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
+    // // Serial.println("");
+    // // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
+    // for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
+    // Serial.print("--");
+    // Serial.print("Voltage: "); Serial.print(battVoltage,2);
+    // Serial.print(", "); Serial.print(funcTime);
+    // Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
     // Serial.println("");
-    // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-    for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
-    Serial.print("--");
-    Serial.print("Voltage: "); Serial.print(battVoltage,2);
-    Serial.print(", "); Serial.print(funcTime);
-    Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
-    Serial.println("");
-    currentFlag = 0;
+    // currentFlag = 0;
 
 
-    delay(100);
+    delay(250);
 
   } else if (stopCondition == MANUAL_STOP) {
     // do stuff

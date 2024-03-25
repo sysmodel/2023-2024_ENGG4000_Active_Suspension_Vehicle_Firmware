@@ -38,7 +38,7 @@
 #define MANUAL_STOP 10
 
 
-int CheckStopCondition(float *cellVolt, float *curr, uint16_t *encPos, bool sw);
+bool CheckStopCondition(float *cellVolt, float *curr, double *encPos, bool sw);
 
 
 #endif // SAFETYSTOP_H

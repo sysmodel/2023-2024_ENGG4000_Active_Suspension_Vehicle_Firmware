@@ -32,7 +32,7 @@ int absEncPosLimits[4] = {0,0,0,0}; // absolute encoder limits
 byte j = 0; // variable for indexing
 
 
-int CheckStopCondition(float *cellVolt, float *curr, uint16_t *encPos, bool sw) {
+bool CheckStopCondition(float *cellVolt, float *curr, double *encPos, bool sw) {
 
     // Note: If one of the wheels at FL/BR/BR triggers the stop condition, it is ...
     //  ... possible that a preceding location in the loop also crossed the limit. ...
