@@ -198,7 +198,7 @@ double AbsEnc::AbsEncVel()
 
     double deltaPosition = _absEncoderPosition - _absEncoderPreviousPosition;
 
-    double deltaTime = (_absEncoderTime - _absEncoderLastTime) / 1000;
+    double deltaTime = (_absEncoderTime - _absEncoderLastTime) / 1e6;
     double _absEncoderVelocity = deltaPosition / deltaTime; 
 
     _absEncoderPreviousPosition = _absEncoderPosition;
