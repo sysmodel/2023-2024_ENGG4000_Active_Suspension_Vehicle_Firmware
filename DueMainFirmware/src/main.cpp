@@ -260,15 +260,23 @@ void CCUpdatePWM() {
   }
 }
 
+
+int amplitude = 6;
+float phase[4] = {0,0.25,0.75,0.5};
+
 void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-I controller to actuate a PWM accordingly.
-  if (stopCondition == 0) {
-    funcTime = micros();
-    GetCurrent();
-    CCUpdatePWM();
-    funcTime = micros() - funcTime;
+
+  funcTime = micros();
+
+  for(i=0;i<4;i++) {
+    setI[i] = amplitude * sin(0.75 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
   }
+
+  GetCurrent();
+  CCUpdatePWM();
+  funcTime = micros() - funcTime;
 }
 
 void SineInput() {
@@ -327,7 +335,7 @@ void setup() {
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
   // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
-  Timer5.attachInterrupt(CheckStop).start(1000000);
+  // Timer5.attachInterrupt(CheckStop).start(1000000);
 }
 
 void loop() {
