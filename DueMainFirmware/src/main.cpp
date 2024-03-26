@@ -27,6 +27,7 @@
 #include "PID_v1.h"
 #include "Waveforms.h"
 #include "SafetyStop.h"
+#include "VCNL4040.h"
 
 //------------------------------------------------------------------
 
@@ -109,6 +110,9 @@ PID piFL(&currentPI[1], &outPI[1], &setIPI[1], Kp, Ki, Kd, DIRECT);
 PID piBR(&currentPI[2], &outPI[2], &setIPI[2], Kp, Ki, Kd, DIRECT);
 PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
+// Create IR sensor object
+VCNL4040IR vcnl4040 = VCNL4040IR();
+double carHeight = 0.0;
 //------------------------------------------------------------------
 
 void SetDirec(int wheel, bool dir) {
@@ -193,6 +197,12 @@ void InitStuff() {
   pinMode(STOP_SWITCH_PIN_IN, INPUT); // input pin to read switch output
   digitalWrite(STOP_SWITCH_PIN_OUT, HIGH);
 
+  // if(vcnl4040.Begin()){
+  //   Serial.println("VCNL-4040 Found");
+  // }else{
+  //   Serial.println("VCNL-4040 Not Found");
+  // }
+
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
     Serial.println("Couldn't find INA260 chip (FR)");
@@ -238,6 +248,13 @@ void InitStuff() {
   absEncoderFL.SetEncPositions(3906, 3196, true);
   absEncoderBR.SetEncPositions(1648, 544, true);
   absEncoderBL.SetEncPositions(3901, 810, false);
+
+
+}
+
+void GetIRData()
+{
+  carHeight = vcnl4040.GetDistance();
 }
 
 void CCUpdatePWM() {
@@ -329,10 +346,11 @@ void setup() {
 
   // Initialize Timmer Interupts for 33Hz
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  //Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   //Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
   // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
   //Timer5.attachInterrupt(CheckStop).start(1000000);
+  Timer6.attachInterrupt(GetIRData).start(100000);
 }
 
 void loop() {
@@ -350,6 +368,8 @@ void loop() {
       quadEncoderFlag = 0;
     }
     */
+
+  //  Serial.println(carHeight);
 
     // Print out absolute encoder data (Validation)
     if (absEncoderFlag == 1) {
@@ -405,7 +425,7 @@ void loop() {
     // currentFlag = 0;
 
 
-    delay(100);
+    delay(250);
 
   } else if (stopCondition == MANUAL_STOP) {
     // do stuff

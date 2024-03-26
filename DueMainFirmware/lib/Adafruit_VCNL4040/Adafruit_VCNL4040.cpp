@@ -65,9 +65,9 @@ boolean Adafruit_VCNL4040::_init(void) {
       Adafruit_BusIO_Register(i2c_dev, VCNL4040_DEVICE_ID, 2);
 
   // make sure we're talking to the right chip
-  if (chip_id.read() != 0x0186) {
-    return false;
-  }
+  // if (chip_id.read() != 0x0186) {
+  //   return false;
+  // }
 
   ALS_CONFIG = new Adafruit_BusIO_Register(i2c_dev, VCNL4040_ALS_CONFIG, 2);
   PS_CONFIG_12 = new Adafruit_BusIO_Register(i2c_dev, VCNL4040_PS_CONF1_L, 2);
