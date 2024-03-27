@@ -67,6 +67,7 @@ void BNO08xIMU::BeginBNO08x()
   Serial.println("BNO08x Found!");   
 
   SetReports();
+
 }
 
 void BNO08xIMU::GetDataIMU()
@@ -98,6 +99,20 @@ void BNO08xIMU::GetDataIMU()
     case SH2_ARVR_STABILIZED_RV:
       QuaternionToEulerRV(&_sensorValue.un.arvrStabilizedRV, &_ypr, true);
     break;
+  }
+
+  // Check if calibration is done yet
+  if (_calibrationFlag == 1)
+  {
+    for (uint16_t i = 0; i < _calibrationCount; i++) 
+    {
+      _sumPitch += _ypr._pitch;
+      _sumRoll += _ypr._roll;
+    }
+  _imuCAL._pitchOffset = _sumPitch / _calibrationCount;
+  _imuCAL._rollOffset = _sumRoll / _calibrationCount;
+  
+  _calibrationFlag = 0;
   }
 
 }

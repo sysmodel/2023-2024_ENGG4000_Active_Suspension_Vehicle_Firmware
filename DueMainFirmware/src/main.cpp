@@ -196,8 +196,8 @@ void GetAbsEncoderData() {
 void GetDataIMU()
 {
   bno08x.GetDataIMU();
-  pitch = bno08x._ypr._pitch;
-  roll = bno08x._ypr._roll;
+  pitch = bno08x._ypr._pitch - bno08x._imuCAL._pitchOffset;
+  roll = bno08x._ypr._roll - bno08x._imuCAL._rollOffset;
   gyroPitch = bno08x._rpRates._pitchRate;
   gyroRoll = bno08x._rpRates._rollRate;
   accelerationZ = bno08x._rpRates._zAcc;
@@ -395,8 +395,12 @@ void loop() {
   
     Serial.print("Pitch: ");
     Serial.print(pitch);
+    Serial.print(" Pitch Offset: ");
+    Serial.print(bno08x._imuCAL._pitchOffset);
     Serial.print(" Roll: ");
     Serial.print(roll);
+    Serial.print(" Roll Offset: ");
+    Serial.print(bno08x._imuCAL._rollOffset);
     Serial.print(" Pitch Rate: ");
     Serial.print(gyroPitch);
     Serial.print(" Roll Rate: ");

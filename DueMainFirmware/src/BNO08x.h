@@ -39,6 +39,12 @@ struct rates {
   float _zAcc;
 };
 
+// Struct for calibration of pitch and roll
+struct calIMU {
+  float _pitchOffset;
+  float _rollOffset;
+};
+
 class BNO08xIMU
 {
   public:
@@ -48,6 +54,7 @@ class BNO08xIMU
     // StructureS
     euler_t _ypr;
     rates _rpRates;
+    calIMU _imuCAL;
 
     // SH2 Report setting protocol function
     void SetReports();
@@ -75,6 +82,8 @@ class BNO08xIMU
 
     sh2_SensorValue_t _sensorValue;
     long _reportIntervalUs = 5000;
+    uint16_t _calibrationCount = 250;
+    uint16_t _calibrationFlag = 1;
     
 };
 
