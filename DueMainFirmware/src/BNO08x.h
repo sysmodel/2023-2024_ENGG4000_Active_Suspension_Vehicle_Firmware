@@ -27,60 +27,67 @@
 
 class BNO08xIMU
 {
-    public:
-        // Constructor 
-        BNO08xIMU();
+  public:
+    // Constructor 
+    BNO08xIMU();
 
-        // Destructor
-        // ~BNO08xIMU();
-
-        // Struct for yaw, pitch, and roll
+     // Struct for yaw, pitch, and roll
         struct euler_t {
         float _yaw;
         float _pitch;
         float _roll;
         } _ypr;
 
-        // Structure for calibration offsets
-        struct Offsets_IMU {
-        double _pitchOffset;
-        double _rollOffset;
-        } _IMUoff;
+    // SH2 Report setting protocol function
+    void SetReports();
 
-        // SH2 Report setting protocol function
-        void SetReports(sh2_SensorId_t reportType, long report_interval);
+    // Begin
+    void BeginBNO08x();
 
-        // Begin
-        void BeginBNO08x();
+    // Math
+    void QuaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees);
 
-        // Math
-        void QuaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees);
+    // Math
+    void QuaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees);
 
-        // Math
-        void QuaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees);
+    // Get gyro data
+    bool GetGyroEvent(sh2_SensorValue_t* gyroData);
+    float GetGyroRollData();
+    float GetGyroPitchData();
 
-        // Get pitch position function
-        double GetPitch();
+    // Get linear acceleration in the z-direction
+    bool GetLinearZAccelerationEvent(sh2_SensorValue_t* linearAccelData);
+    float GetAccZData();
 
-        // Get roll position function
-        double GetRoll();
+    // Get pitch and roll data
+    bool GetPitchAndRollEvent(sh2_SensorValue_t* pitchAndRollData);
+    void GetRollAndPitchData();
 
-        // Get pitch and roll rates function
-        double GetPitchAndRollRates();
+
+
+
+  private: 
+    // Create object
+    Adafruit_BNO08x  *_bno08x;
+
+    sh2_SensorValue_t _gyroValues;
+    sh2_SensorValue_t _linearAccelValue;
+    sh2_SensorValue_t _pitchAndRollValues;
+
+    // Quaternion Values
+    float _i;
+    float _j;
+    float _k;
+    float _real;
+
+
+    // Variables for calibration
+    double _sumYaw = 0.0;
+    double _sumPitch = 0.0;
+    double _sumRoll = 0.0;
+
+    long _reportIntervalUs = 5000;
     
-    private: 
-        // Create object
-        Adafruit_BNO08x  *_bno08x;
-
-        // Variables for calibration
-        double _sumYaw = 0.0;
-        double _sumPitch = 0.0;
-        double _sumRoll = 0.0;
-
-
-        // Variables for report types
-        sh2_SensorId_t _reportTypePitchRoll = SH2_ARVR_STABILIZED_RV;
-        long _reportIntervalUs = 5000;
 
 };
 

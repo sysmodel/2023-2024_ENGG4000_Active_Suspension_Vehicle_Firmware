@@ -117,14 +117,15 @@ double carHeight = 0.0;
 
 // Create IMU object and corresponding global variables
 BNO08xIMU bno08x = BNO08xIMU();
-double pitch;
-double roll;
-double pitchRate;
-double rollRate;
-double verticalAcceleration;
-double calibratedRoll;
-double calibratedPitch;
-int calibrationFlagIMU = 1;
+sh2_SensorValue_t gyroValue;
+sh2_SensorValue_t linearAccelValue;
+sh2_SensorValue_t pitchAndRollValue;
+float pitch;
+float roll;
+float accelerationZ;
+float gyroRoll;
+float gyroPitch;
+int FlagIMU = 0;
 
 //------------------------------------------------------------------
 
@@ -194,14 +195,15 @@ void GetAbsEncoderData() {
 
 void GetDataIMU()
 {
-  if (calibrationFlagIMU == 1)
-  {
-    calibratedRoll = bno08x.CalibrateRollIMU();
-    calibrationFlagIMU = 0;
-  }
-  roll = bno08x.GetRoll() - calibratedRoll; 
-  pitch = bno08x.GetPitch() - calibratedPitch;
-  
+  bno08x.GetRollAndPitchData();
+  pitch = bno08x._ypr._pitch;
+  roll = bno08x._ypr._roll;
+  accelerationZ = bno08x.GetAccZData();
+  gyroPitch = bno08x.GetGyroPitchData();
+  gyroRoll = bno08x.GetGyroRollData();
+
+  FlagIMU = 1;
+
 }
 
 void InitStuff() {
@@ -230,6 +232,7 @@ void InitStuff() {
 
   // IMU Setup
   bno08x.BeginBNO08x();
+  bno08x.SetReports();
 
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
@@ -379,7 +382,7 @@ void setup() {
   // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
   //Timer5.attachInterrupt(CheckStop).start(1000000);
   //Timer6.attachInterrupt(GetIRData).start(100000);
-  Timer7.attachInterrupt(GetDataIMU).start(100000);
+  Timer7.attachInterrupt(GetDataIMU).start(30303);
 }
 
 void loop() {
@@ -389,14 +392,21 @@ void loop() {
 
     timeCount = millis();
 
+    
+  if (FlagIMU == 1)
+  {
     Serial.print("Pitch: ");
     Serial.print(pitch);
-    Serial.print(" Calibrated Pitch: ");
-    Serial.print(calibratedPitch);
     Serial.print(" Roll: ");
     Serial.print(roll);
-    Serial.print(" Calibrated Roll: ");
-    Serial.println(calibratedRoll);
+    Serial.print(" Pitch Rate: ");
+    Serial.print(gyroPitch);
+    Serial.print(" Roll Rate: ");
+    Serial.print(gyroRoll);
+    Serial.print(" Z - Acc: ");
+    Serial.println(accelerationZ);
+    FlagIMU = 0;
+  }
 
     /*
     // Print out quadrature encoder data (Validation)
@@ -463,7 +473,7 @@ void loop() {
     // currentFlag = 0;
 
 
-    delay(250);
+    delay(100);
 
   } else if (stopCondition == MANUAL_STOP) {
     // do stuff
