@@ -28,7 +28,7 @@ class VCNL4040IR
         // Cosntructor 
         VCNL4040IR(); 
 
-        // Cosntructor 
+        // Destructor 
         ~VCNL4040IR();
 
         // Begin

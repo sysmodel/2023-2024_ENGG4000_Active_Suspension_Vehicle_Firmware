@@ -1,5 +1,5 @@
 /* 
-* Sys-MoDEL Active Suspension VCNL4040.h file
+* Sys-MoDEL Active Suspension VCNL4040.cpp file
 *
 * Authors: Gregory Stewart, John Estafanos, Andrew Kennah, Patrick Laforest
 * Creation Date: Jan 6, 2024

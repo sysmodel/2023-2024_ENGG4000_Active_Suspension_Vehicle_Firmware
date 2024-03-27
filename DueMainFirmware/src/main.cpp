@@ -28,6 +28,7 @@
 #include "Waveforms.h"
 #include "SafetyStop.h"
 #include "VCNL4040.h"
+#include "BNO08x.h"
 
 //------------------------------------------------------------------
 
@@ -113,6 +114,18 @@ PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 // Create IR sensor object
 VCNL4040IR vcnl4040 = VCNL4040IR();
 double carHeight = 0.0;
+
+// Create IMU object and corresponding global variables
+BNO08xIMU bno08x = BNO08xIMU();
+double pitch;
+double roll;
+double pitchRate;
+double rollRate;
+double verticalAcceleration;
+double calibratedRoll;
+double calibratedPitch;
+int calibrationFlagIMU = 1;
+
 //------------------------------------------------------------------
 
 void SetDirec(int wheel, bool dir) {
@@ -179,6 +192,18 @@ void GetAbsEncoderData() {
   absEncoderFlag = 1;
 }
 
+void GetDataIMU()
+{
+  if (calibrationFlagIMU == 1)
+  {
+    calibratedRoll = bno08x.CalibrateRollIMU();
+    calibrationFlagIMU = 0;
+  }
+  roll = bno08x.GetRoll() - calibratedRoll; 
+  pitch = bno08x.GetPitch() - calibratedPitch;
+  
+}
+
 void InitStuff() {
   // Initialize serial communication at 115200 bps
   Serial.begin(115200);
@@ -203,6 +228,9 @@ void InitStuff() {
   //   Serial.println("VCNL-4040 Not Found");
   // }
 
+  // IMU Setup
+  bno08x.BeginBNO08x();
+
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
     Serial.println("Couldn't find INA260 chip (FR)");
@@ -220,7 +248,7 @@ void InitStuff() {
     Serial.println("Couldn't find INA260 chip (BL)");
     // while (1);
   }
-  Serial.println("Found INA260 chip");
+  //Serial.println("Found INA260 chip");
   ina260FR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260FL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260BR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
@@ -340,7 +368,7 @@ void setup() {
   while (!Serial) {delay(1);}
 
   // setI[4] = {-8.0,-8.0,1.0,1.0};
-  for(int i=0;i<4;i++) {Serial.println(setI[i]);}
+  // for(int i=0;i<4;i++) {Serial.println(setI[i]);}
   for(int i=0;i<4;i++) {desDirec[i] = 0;}
   for(int i=0;i<4;i++) {SetDirec(i,0);}
 
@@ -350,7 +378,8 @@ void setup() {
   //Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
   // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
   //Timer5.attachInterrupt(CheckStop).start(1000000);
-  Timer6.attachInterrupt(GetIRData).start(100000);
+  //Timer6.attachInterrupt(GetIRData).start(100000);
+  Timer7.attachInterrupt(GetDataIMU).start(100000);
 }
 
 void loop() {
@@ -359,6 +388,15 @@ void loop() {
 
 
     timeCount = millis();
+
+    Serial.print("Pitch: ");
+    Serial.print(pitch);
+    Serial.print(" Calibrated Pitch: ");
+    Serial.print(calibratedPitch);
+    Serial.print(" Roll: ");
+    Serial.print(roll);
+    Serial.print(" Calibrated Roll: ");
+    Serial.println(calibratedRoll);
 
     /*
     // Print out quadrature encoder data (Validation)

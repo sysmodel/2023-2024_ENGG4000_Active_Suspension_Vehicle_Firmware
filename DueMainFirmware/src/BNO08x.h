@@ -28,30 +28,60 @@
 class BNO08xIMU
 {
     public:
-        // Default constructor 
-        BNO08xIMU() {}
+        // Constructor 
+        BNO08xIMU();
 
-        // Struct for euler angles
+        // Destructor
+        // ~BNO08xIMU();
+
+        // Struct for yaw, pitch, and roll
         struct euler_t {
-            float yaw;
-            float pitch;
-            float roll;
-        } ypr;
+        float _yaw;
+        float _pitch;
+        float _roll;
+        } _ypr;
 
-        // Quaternion to Euler Angles
-        void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees = false);
+        // Structure for calibration offsets
+        struct Offsets_IMU {
+        double _pitchOffset;
+        double _rollOffset;
+        } _IMUoff;
 
+        // SH2 Report setting protocol function
+        void SetReports(sh2_SensorId_t reportType, long report_interval);
+
+        // Begin
+        void BeginBNO08x();
+
+        // Math
+        void QuaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees);
+
+        // Math
+        void QuaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees);
+
+        // Get pitch position function
+        double GetPitch();
+
+        // Get roll position function
+        double GetRoll();
+
+        // Get pitch and roll rates function
+        double GetPitchAndRollRates();
     
     private: 
+        // Create object
+        Adafruit_BNO08x  *_bno08x;
+
         // Variables for calibration
-        float calibratedYaw = 0.0;
-        float calibratedPitch = 0.0;
-        float calibratedRoll = 0.0;
-        float updatedYaw = 0.0;
-        float updatedPitch = 0.0;
-        float updatedRoll = 0.0;
-        uint16_t calibrationCount = 250;
-        uint16_t calibrationFlag = 1;
-}
+        double _sumYaw = 0.0;
+        double _sumPitch = 0.0;
+        double _sumRoll = 0.0;
+
+
+        // Variables for report types
+        sh2_SensorId_t _reportTypePitchRoll = SH2_ARVR_STABILIZED_RV;
+        long _reportIntervalUs = 5000;
+
+};
 
 #endif
