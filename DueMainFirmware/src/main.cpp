@@ -195,15 +195,14 @@ void GetAbsEncoderData() {
 
 void GetDataIMU()
 {
-  bno08x.GetRollAndPitchData();
+  bno08x.GetDataIMU();
   pitch = bno08x._ypr._pitch;
   roll = bno08x._ypr._roll;
-  accelerationZ = bno08x.GetAccZData();
-  gyroPitch = bno08x.GetGyroPitchData();
-  gyroRoll = bno08x.GetGyroRollData();
+  gyroPitch = bno08x._rpRates._pitchRate;
+  gyroRoll = bno08x._rpRates._rollRate;
+  accelerationZ = bno08x._rpRates._zAcc;
 
   FlagIMU = 1;
-
 }
 
 void InitStuff() {
@@ -393,8 +392,7 @@ void loop() {
     timeCount = millis();
 
     
-  if (FlagIMU == 1)
-  {
+  
     Serial.print("Pitch: ");
     Serial.print(pitch);
     Serial.print(" Roll: ");
@@ -406,7 +404,7 @@ void loop() {
     Serial.print(" Z - Acc: ");
     Serial.println(accelerationZ);
     FlagIMU = 0;
-  }
+  
 
     /*
     // Print out quadrature encoder data (Validation)

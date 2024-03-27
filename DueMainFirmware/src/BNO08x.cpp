@@ -28,9 +28,9 @@ BNO08xIMU::BNO08xIMU()
 
 void BNO08xIMU::SetReports() 
 {
-    _bno08x->enableReport(SH2_GYROSCOPE_CALIBRATED, 2000);
-    _bno08x->enableReport(SH2_LINEAR_ACCELERATION, 2000);
-    _bno08x->enableReport(SH2_ARVR_STABILIZED_RV, 2000);
+    _bno08x->enableReport(SH2_GYROSCOPE_CALIBRATED, _reportIntervalUs);
+    _bno08x->enableReport(SH2_LINEAR_ACCELERATION, _reportIntervalUs);
+    _bno08x->enableReport(SH2_ARVR_STABILIZED_RV, _reportIntervalUs);
 }
 
 void BNO08xIMU::QuaternionToEuler(float qr, float qi, float qj, float qk, euler_t* _ypr, bool degrees)
@@ -65,54 +65,39 @@ void BNO08xIMU::BeginBNO08x()
     }
   }
   Serial.println("BNO08x Found!");   
+
+  SetReports();
 }
 
-// Functions to get Gyro Data
-bool BNO08xIMU::GetGyroEvent(sh2_SensorValue_t* gyroData)
+void BNO08xIMU::GetDataIMU()
 {
-  return _bno08x->getSensorEvent(gyroData);
-}
+  // Check if reset occured 
+  if (_bno08x->wasReset()) 
+  {
+    Serial.print("sensor was reset ");
+    SetReports();
+  }
 
-float BNO08xIMU::GetGyroRollData()
-{
-    if(GetGyroEvent(&_gyroValues))
-    {
-        return _gyroValues.un.gyroscope.x;
-    }
-}
+  // Get data from each sensor event and store in struct
+  if(!_bno08x->getSensorEvent(&_sensorValue))
+  {
+    return;
+  }
 
-float BNO08xIMU::GetGyroPitchData()
-{
-    if(GetGyroEvent(&_gyroValues))
-    {
-        return _gyroValues.un.gyroscope.y;
-    }
-}
+  switch(_sensorValue.sensorId)
+  {
+    case SH2_GYROSCOPE_CALIBRATED:
+      _rpRates._pitchRate = _sensorValue.un.gyroscope.x;
+      _rpRates._rollRate = _sensorValue.un.gyroscope.y;
+    break;
 
-// Get linear acceleration in the z-direction
-bool BNO08xIMU::GetLinearZAccelerationEvent(sh2_SensorValue_t* linearAccelData)
-{
-  return _bno08x->getSensorEvent(linearAccelData);
-}
+    case SH2_LINEAR_ACCELERATION:
+      _rpRates._zAcc = _sensorValue.un.linearAcceleration.x;
+    break;
 
-float BNO08xIMU::GetAccZData()
-{
-    if(GetLinearZAccelerationEvent(&_linearAccelValue))
-    {
-        return _linearAccelValue.un.linearAcceleration.z;
-    }
-}
+    case SH2_ARVR_STABILIZED_RV:
+      QuaternionToEulerRV(&_sensorValue.un.arvrStabilizedRV, &_ypr, true);
+    break;
+  }
 
-// Get pitch and roll quaternion data
-bool BNO08xIMU::GetPitchAndRollEvent(sh2_SensorValue_t* pitchAndRollData)
-{
-  return _bno08x->getSensorEvent(pitchAndRollData);
-}
-
-void BNO08xIMU::GetRollAndPitchData()
-{
-    if (GetPitchAndRollEvent(&_pitchAndRollValues))
-    {
-        return QuaternionToEulerRV(&_pitchAndRollValues.un.arvrStabilizedRV, &_ypr, true);
-    }
 }
