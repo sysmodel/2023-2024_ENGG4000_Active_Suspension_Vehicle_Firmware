@@ -79,7 +79,7 @@ uint8_t quadEncoderFlag = 0;
 uint8_t absEncoderFlag = 0;
 uint8_t resolution = 12;
 // - Define global variable to store abs encoder positions and speeds
-uint16_t absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
+double absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
 double absEncCurrentVelocity[4] = {0,0,0,0}; // array of absolute encoder velocities
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
 uint8_t sdoPin[4] = {11, 31, 7, 9};
@@ -223,12 +223,6 @@ void InitStuff() {
   pinMode(STOP_SWITCH_PIN_IN, INPUT); // input pin to read switch output
   digitalWrite(STOP_SWITCH_PIN_OUT, HIGH);
 
-  // if(vcnl4040.Begin()){
-  //   Serial.println("VCNL-4040 Found");
-  // }else{
-  //   Serial.println("VCNL-4040 Not Found");
-  // }
-
   // IMU Setup
   bno08x.BeginBNO08x();
   bno08x.SetReports();
@@ -250,7 +244,7 @@ void InitStuff() {
     Serial.println("Couldn't find INA260 chip (BL)");
     // while (1);
   }
-  //Serial.println("Found INA260 chip");
+  
   ina260FR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260FL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260BR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
@@ -351,6 +345,26 @@ void SineInput() {
   // }
 }
 
+void SendDataFunc()
+{
+  Serial.print("{");
+  Serial.print(absEncCurrentPosition[0],2);Serial.print(","); 
+  Serial.print(absEncCurrentPosition[1],2);Serial.print(","); 
+  Serial.print(absEncCurrentPosition[2],2);Serial.print(","); 
+  Serial.print(absEncCurrentPosition[3],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[0],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[1],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[2],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[3],2);Serial.print(","); 
+  Serial.print(quadEncoderVel,2);Serial.print(","); 
+  Serial.print(pitch,2);Serial.print(","); 
+  Serial.print(roll,2);Serial.print(","); 
+  Serial.print(accelerationZ,2);Serial.print(","); 
+  Serial.print(gyroRoll,2);Serial.print(","); 
+  Serial.print(gyroPitch,2);
+  Serial.println("}");
+}
+
 void CheckStop() {
   if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
     switchStatus = true;
@@ -375,105 +389,28 @@ void setup() {
   for(int i=0;i<4;i++) {SetDirec(i,0);}
 
   // Initialize Timmer Interupts for 33Hz
-  // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  //Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  //Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
+  Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
+  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  // Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
   // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
-  //Timer5.attachInterrupt(CheckStop).start(1000000);
-  //Timer6.attachInterrupt(GetIRData).start(100000);
-  Timer7.attachInterrupt(GetDataIMU).start(30303);
+  // Timer5.attachInterrupt(CheckStop).start(1000000);
+  Timer6.attachInterrupt(GetDataIMU).start(30303);
 }
 
 void loop() {
   if (stopCondition == 0) {
     GetVoltage();
 
+    // timeCount = millis();
 
-    timeCount = millis();
-
-    
-  
-    Serial.print("Pitch: ");
-    Serial.print(pitch);
-    Serial.print(" Pitch Offset: ");
-    Serial.print(bno08x._imuCAL._pitchOffset);
-    Serial.print(" Roll: ");
-    Serial.print(roll);
-    Serial.print(" Roll Offset: ");
-    Serial.print(bno08x._imuCAL._rollOffset);
-    Serial.print(" Pitch Rate: ");
-    Serial.print(gyroPitch);
-    Serial.print(" Roll Rate: ");
-    Serial.print(gyroRoll);
-    Serial.print(" Z - Acc: ");
-    Serial.println(accelerationZ);
-    FlagIMU = 0;
-  
-
-    /*
-    // Print out quadrature encoder data (Validation)
-    if (quadEncoderFlag == 1) {
-      Serial.print("Quad Encoder Velocity (rad/s): ");
-      Serial.println(quadEncoderVel);
-      quadEncoderFlag = 0;
+    if (Serial.available())
+    {
+      while(Serial.available())
+      {
+        Serial.read();
+      }
+      SendDataFunc();
     }
-    */
-
-  //  Serial.println(carHeight);
-
-    // Print out absolute encoder data (Validation)
-    if (absEncoderFlag == 1) {
-      Serial.print("FR Pos: ");
-      Serial.print(absEncCurrentVelocity[0]);
-      Serial.print(" FL Pos: ");
-      Serial.print(absEncCurrentVelocity[1]);
-      Serial.print(" BR Pos: ");
-      Serial.print(absEncCurrentVelocity[2]);
-      Serial.print(" BL Pos: ");
-      Serial.println(absEncCurrentVelocity[3]);
-      // absEncPositionFromTopFR
-      // Serial.print(" FR Abs Encoder Velocity: ");
-      // Serial.println(absEncCurrentVelocityFR);
-      absEncoderFlag = 0;
-
-
-      // Independent of the abs. encoders but should print at the same time
-      // Serial.print("Currents: ");
-      // for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
-      // Serial.println("");
-    }
-
-    // Serial.print("Currents: ");
-    // for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-    // Serial.println("");
-    // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-    // Serial.println("");
-    // Serial.print("Voltage: "); Serial.println(battVoltage,2);
-
-    // if(currentFlag == 1) {
-    //   Serial.println("Currents: ");
-    //   for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-    //   // Serial.println("");
-    //   // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-    //   for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
-    //   Serial.print("--");
-    //   Serial.print("Voltage: "); Serial.print(battVoltage,2);
-    //   Serial.print(", "); Serial.println(funcTime);
-    //   currentFlag = 0;
-    // }
-
-    // Serial.println("Currents: ");
-    // for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-    // // Serial.println("");
-    // // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-    // for(int i=0;i<4;i++) {Serial.print(pwm[i]); Serial.print(",");}
-    // Serial.print("--");
-    // Serial.print("Voltage: "); Serial.print(battVoltage,2);
-    // Serial.print(", "); Serial.print(funcTime);
-    // Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
-    // Serial.println("");
-    // currentFlag = 0;
-
 
     delay(100);
 
