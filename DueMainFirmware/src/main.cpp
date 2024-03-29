@@ -89,11 +89,16 @@ int lastStopCondition = 0;
 int tempStopCondition = 0;
 
 // Demo setpoints
-String demoName;
-float jumpSetI[10] = {0,0,0,0,0,0,0,-12,-12,14};
+String demoName = "Front2Back"; // Options: Around, Bounce, Left2Right, Front2Back
+float jumpSetI[10] = {0,0,0,0,0,-10,-10,12};
 int jsi = 0;
 int amplitude = 6;
 float phase[4] = {0,0.25,0.75,0.5};
+float phaseL2R[4] = {0,0.5,0,0.5};
+float phaseF2B[4] = {0,0,0.5,0.5};
+int bounceTime;
+float frequency = 0.75;
+float frequency2 = 1.25;
 
 // IMU (BNO08x) variables
 sh2_SensorValue_t gyroValue;
@@ -135,6 +140,82 @@ PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
 // Create IMU object
 BNO08xIMU bno08x = BNO08xIMU();
+
+//------------------------------------------------------------------
+
+void SetDirec(int wheel, bool dir);
+void GetCurrent();
+void GetVoltage();
+void GetQuadEncoderData();
+void GetAbsEncoderData();
+void GetDataIMU();
+void GetSteeringAngle();
+void InitStuff();
+void CCUpdatePWM();
+void ActuateAction();
+void DemoSetpoints();
+void SendDataFunc();
+void CheckStop();
+
+//------------------------------------------------------------------
+
+void setup() {
+
+  InitStuff();
+
+  // Wait until serial port is opened
+  while (!Serial) {delay(1);}
+
+  // setI[4] = {-8.0,-8.0,1.0,1.0};
+  // for(int i=0;i<4;i++) {Serial.println(setI[i]);}
+  for(int i=0;i<4;i++) {desDirec[i] = 0;}
+  for(int i=0;i<4;i++) {SetDirec(i,0);}
+
+  // Initialize Timmer Interupts for 33Hz
+  Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
+  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
+  Timer5.attachInterrupt(CheckStop).start(500000);
+  Timer6.attachInterrupt(GetDataIMU).start(30303);
+  Timer7.attachInterrupt(GetSteeringAngle).start(30303);
+}
+
+void loop() {
+  if (stopCondition == 0) {
+    GetVoltage();
+
+    // timeCount = millis();
+
+    if (Serial.available())
+    {
+      while(Serial.available())
+      {
+        Serial.read();
+      }
+      SendDataFunc();
+    }
+
+    delay(100);
+
+  } else {
+    Timer3.stop();
+    for(i=0;i<4;i++) {
+      analogWrite(mdEnPins[i],0);
+      SetDirec(i,0);
+    }
+
+    // // Print fault code; comment out this section if printing is not desired
+    // Serial.print("Stop condition identified. Code: ");
+    // Serial.print(stopCondition);
+    // Serial.print(".");
+    // Serial.println();
+    // Serial.println("Stopped. Must restart.");
+
+    while(1);
+    // If a limit is crossed, one should check the serial log.
+    // The only way to get out of an auto stop is to restart the program.
+  }
+}
 
 //------------------------------------------------------------------
 
@@ -318,6 +399,9 @@ void ActuateAction() {
   // ... compute the FF-I controller to actuate a PWM accordingly.
   if (stopCondition == 0) {
     funcTime = micros();
+
+    DemoSetpoints();
+
     GetCurrent();
     CCUpdatePWM();
     funcTime = micros() - funcTime;
@@ -326,23 +410,37 @@ void ActuateAction() {
 
 void DemoSetpoints() {
 
-  // setI[0] = jumpSetI[jsi];
-  // setI[1] = jumpSetI[jsi];
-  // setI[2] = jumpSetI[jsi];
-  // setI[3] = jumpSetI[jsi];
-  // jsi++;
-  // if (jsi > 9) {jsi = 0;}
+  if (demoName == "Around") {
 
+    for(i=0;i<4;i++) {
+      setI[i] = amplitude * sin(frequency * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+    }
 
-  // setI[0] = -5;
-  // setI[1] = -5;
-  // setI[2] = -5;
-  // setI[3] = -5;
+  } else if (demoName == "Bounce") {
 
-  // for(i=0;i<4;i++) {
-  //   setI[i] = amplitude * sin(0.75 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
-  // }
+    for(i=0;i<4;i++) {
+      setI[i] = jumpSetI[jsi];
+    }
+    if (funcTime - bounceTime >= 100000) {
+      bounceTime = funcTime;
+      jsi++;
+      if (jsi > 9) {jsi = 0;}
+    }
 
+  } else if (demoName == "Left2Right") {
+    
+    for(i=0;i<4;i++) {
+      setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseL2R[i]*2*PI);
+    }
+
+  } else if (demoName == "Front2Back") {
+    
+    for(i=0;i<4;i++) {
+      setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseF2B[i]*2*PI);
+    }
+
+  }
+ 
 }
 
 void SendDataFunc()
@@ -374,65 +472,5 @@ void CheckStop() {
   if ((lastLastStopCondition == lastStopCondition) && (lastStopCondition == tempStopCondition))
   {
     stopCondition = tempStopCondition;
-  }
-}
-
-//------------------------------------------------------------------
-
-void setup() {
-
-  InitStuff();
-
-  // Wait until serial port is opened
-  while (!Serial) {delay(1);}
-
-  // setI[4] = {-8.0,-8.0,1.0,1.0};
-  // for(int i=0;i<4;i++) {Serial.println(setI[i]);}
-  for(int i=0;i<4;i++) {desDirec[i] = 0;}
-  for(int i=0;i<4;i++) {SetDirec(i,0);}
-
-  // Initialize Timmer Interupts for 33Hz
-  Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
-  Timer5.attachInterrupt(CheckStop).start(500000);
-  Timer6.attachInterrupt(GetDataIMU).start(30303);
-  Timer7.attachInterrupt(GetSteeringAngle).start(30303);
-}
-
-void loop() {
-  if (stopCondition == 0) {
-    GetVoltage();
-
-    // timeCount = millis();
-
-    if (Serial.available())
-    {
-      while(Serial.available())
-      {
-        Serial.read();
-      }
-      SendDataFunc();
-    }
-
-    delay(100);
-
-  } else {
-    Timer3.stop();
-    for(i=0;i<4;i++) {
-      analogWrite(mdEnPins[i],0);
-      SetDirec(i,0);
-    }
-
-    // // Print fault code; comment out this section if printing is not desired
-    // Serial.print("Stop condition identified. Code: ");
-    // Serial.print(stopCondition);
-    // Serial.print(".");
-    // Serial.println();
-    // Serial.println("Stopped. Must restart.");
-
-    while(1);
-    // If a limit is crossed, one should check the serial log.
-    // The only way to get out of an auto stop is to restart the program.
   }
 }
