@@ -32,10 +32,8 @@
 
 #define led LED_BUILTIN
 #define steerPotPin A4
-#define battCell1Pin A3
+#define battCell1Pin A0
 #define battCell2Pin A2
-#define STOP_SWITCH_PIN_OUT 30
-#define STOP_SWITCH_PIN_IN 31
 
 //------------------------------------------------------------------
 
@@ -77,7 +75,7 @@ uint8_t quadEncoderFlag = 0;
 uint8_t absEncoderFlag = 0;
 uint8_t resolution = 12;
 // - Define global variable to store abs encoder positions and speeds
-uint16_t absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
+double absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
 double absEncCurrentVelocity[4] = {0,0,0,0}; // array of absolute encoder velocities
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
 uint8_t sdoPin[4] = {11, 13, 7, 9};
@@ -86,8 +84,9 @@ uint8_t csPin[4] = {25, 24, 27, 26};
 
 // Safety stop
 int stopCondition = 0;
+int lastLastStopCondition = 0;
 int lastStopCondition = 0;
-bool switchStatus = false;
+int tempStopCondition = 0;
 
 //------------------------------------------------------------------
 
@@ -189,9 +188,6 @@ void InitStuff() {
   pinMode(steerPotPin, INPUT);  // steering potentiometer pin
   pinMode(battCell1Pin, INPUT); // pin of voltage sensor measuring battery cell #1
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
-  pinMode(STOP_SWITCH_PIN_OUT, OUTPUT); // high pin will passed/stopped by switch
-  pinMode(STOP_SWITCH_PIN_IN, INPUT); // input pin to read switch output
-  digitalWrite(STOP_SWITCH_PIN_OUT, HIGH);
 
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
@@ -270,50 +266,41 @@ void ActuateAction() {
 
   funcTime = micros();
 
-  for(i=0;i<4;i++) {
-    setI[i] = amplitude * sin(0.75 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
-  }
+  // for(i=0;i<4;i++) {
+  //   setI[i] = amplitude * sin(0.75 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+  // }
 
   GetCurrent();
   CCUpdatePWM();
   funcTime = micros() - funcTime;
 }
 
-void SineInput() {
-  // for(i=0;i<4;i++) {
-  //   setI[i] = float(int(waveformsTable[0][sineCount+i*5]-1000))/800;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
-  // }
-  // // setI[0] = int(waveformsTable[0][sineCount]);
-  // // setI[1] = int(waveformsTable[0][sineCount+5]);
-  // // setI[2] = int(waveformsTable[0][sineCount+10]);
-  // // setI[3] = int(waveformsTable[0][sineCount+15]);
-  // sineCount++;
-  // if((sineCount+i*5) >= maxSamplesNum) {sineCount = 0;}
 
-  // for(i=0;i<4;i++) {
-  //   setI[i] = -1*sineCount+i/2;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
-  // }
-  // sineCount++;
-  // if(sineCount>4) {sineCount=0;}
-  setI[0] = -10;
-  setI[1] = 0;
-  setI[2] = 0;
-  setI[3] = 0;
-  // for(int i=0;i<4;i++) {
-  //   desDirec[i] = 0;
-  //   SetDirec(i,desDirec[i]);
-  // }
+float jumpSetI[10] = {0,0,0,0,0,0,0,-12,-12,14};
+int jsi = 0;
+
+void SineInput() {
+
+  // setI[0] = jumpSetI[jsi];
+  // setI[1] = jumpSetI[jsi];
+  // setI[2] = jumpSetI[jsi];
+  // setI[3] = jumpSetI[jsi];
+  // jsi++;
+  // if (jsi > 9) {jsi = 0;}
+
+
+  setI[0] = -5;
+  setI[1] = -5;
+  setI[2] = -5;
+  setI[3] = -5;
+
 }
 
 void CheckStop() {
-  if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
-    switchStatus = true;
-  } else {
-    switchStatus = false;
-  }
-  switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), &(absEncCurrentPosition[0]), switchStatus);
+  lastLastStopCondition = lastStopCondition;
+  lastStopCondition = tempStopCondition;
+  tempStopCondition = CheckStopCondition(voltArray, current);
+  if ((lastLastStopCondition == lastStopCondition) && (lastStopCondition == tempStopCondition)) {stopCondition = tempStopCondition;}
 }
 
 //------------------------------------------------------------------
@@ -334,8 +321,8 @@ void setup() {
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
-  // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
-  // Timer5.attachInterrupt(CheckStop).start(1000000);
+  // Timer4.attachInterrupt(SineInput).start(200000); // Timer for sinusoidal input to actuators
+  Timer5.attachInterrupt(CheckStop).start(500000);
 }
 
 void loop() {
@@ -396,32 +383,32 @@ void loop() {
     Serial.print("--");
     Serial.print("Voltage: "); Serial.print(battVoltage,2);
     Serial.print(", "); Serial.print(funcTime);
-    Serial.print(", "); for(int i=0;i<4;i++) {Serial.print(direc[i]); Serial.print(",");}
+    Serial.print(", "); for(int i=0;i<2;i++) {Serial.print(voltArray[i]); Serial.print(",");}
     Serial.println("");
     currentFlag = 0;
 
 
-    delay(100);
+    delay(500);
 
-  } else if (stopCondition == MANUAL_STOP) {
-    // do stuff
-    for(i=0;i<4;i++) {
-      analogWrite(pwm[i],0);
-      SetDirec(i,0);
-    }
-    Serial.print("Manual stop condition. Code: ");
-    Serial.print(stopCondition);
-    Serial.println();
+
+
+
+
   } else {
     // do stuff
+    Timer3.stop();
     for(i=0;i<4;i++) {
-      analogWrite(pwm[i],0);
+      analogWrite(mdEnPins[i],0);
       SetDirec(i,0);
     }
-    Serial.print("Auto stop condition. Code: ");
+    Serial.print("Stop condition identified. Code: ");
     Serial.print(stopCondition);
+    Serial.print(".");
     Serial.println();
-    while(1);
+    while(1) {
+      Serial.println("Stopped. Must restart.");
+      delay(1000);
+    };
     // If a limit is crossed, one should check the serial log.
     // The only way to get out of an auto stop is to restart the program.
   }
