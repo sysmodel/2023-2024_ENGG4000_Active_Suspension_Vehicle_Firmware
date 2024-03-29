@@ -58,14 +58,14 @@ void BNO08xIMU::QuaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector,
 
 void BNO08xIMU::BeginBNO08x()
 {
-  if (!_bno08x->begin_I2C()) {
-    Serial.println("Failed to find BNO08x chip");
-    while (1) {
-      delay(10);
-    }
-  }
-  Serial.println("BNO08x Found!");   
-
+  //if (!_bno08x->begin_I2C()) {
+    //Serial.println("Failed to find BNO08x chip");
+    //while (1) {
+      //delay(10);
+    //}
+  //}
+  // Serial.println("BNO08x Found!");   
+  _bno08x->begin_I2C();
   SetReports();
 
 }
@@ -75,7 +75,7 @@ void BNO08xIMU::GetDataIMU()
   // Check if reset occured 
   if (_bno08x->wasReset()) 
   {
-    Serial.print("sensor was reset ");
+    // Serial.print("sensor was reset ");
     SetReports();
   }
 
@@ -108,6 +108,7 @@ void BNO08xIMU::GetDataIMU()
     {
       _sumPitch += _ypr._pitch;
       _sumRoll += _ypr._roll;
+      _sumYaw += _ypr._yaw;
     }
   _imuCAL._pitchOffset = _sumPitch / _calibrationCount;
   _imuCAL._rollOffset = _sumRoll / _calibrationCount;

@@ -122,6 +122,7 @@ sh2_SensorValue_t linearAccelValue;
 sh2_SensorValue_t pitchAndRollValue;
 float pitch;
 float roll;
+float yaw;
 float accelerationZ;
 float gyroRoll;
 float gyroPitch;
@@ -198,6 +199,7 @@ void GetDataIMU()
   bno08x.GetDataIMU();
   pitch = bno08x._ypr._pitch - bno08x._imuCAL._pitchOffset;
   roll = bno08x._ypr._roll - bno08x._imuCAL._rollOffset;
+  yaw = bno08x._ypr._yaw - bno08x._imuCAL._yawOffsest;
   gyroPitch = bno08x._rpRates._pitchRate;
   gyroRoll = bno08x._rpRates._rollRate;
   accelerationZ = bno08x._rpRates._zAcc;
@@ -359,6 +361,7 @@ void SendDataFunc()
   Serial.print(quadEncoderVel,2);Serial.print(","); 
   Serial.print(pitch,2);Serial.print(","); 
   Serial.print(roll,2);Serial.print(","); 
+  Serial.print(yaw,2);Serial.print(","); 
   Serial.print(accelerationZ,2);Serial.print(","); 
   Serial.print(gyroRoll,2);Serial.print(","); 
   Serial.print(gyroPitch,2);

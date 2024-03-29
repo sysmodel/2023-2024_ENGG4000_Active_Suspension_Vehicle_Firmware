@@ -43,6 +43,7 @@ struct rates {
 struct calIMU {
   float _pitchOffset;
   float _rollOffset;
+  float _yawOffsest;
 };
 
 class BNO08xIMU
