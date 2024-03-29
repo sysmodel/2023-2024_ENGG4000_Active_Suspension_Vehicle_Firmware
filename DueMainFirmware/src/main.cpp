@@ -79,12 +79,12 @@ uint8_t quadEncoderFlag = 0;
 uint8_t absEncoderFlag = 0;
 uint8_t resolution = 12;
 // - Define global variable to store abs encoder positions and speeds
-uint16_t absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
+double absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
 double absEncCurrentVelocity[4] = {0,0,0,0}; // array of absolute encoder velocities
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
 uint8_t sdoPin[4] = {11, 31, 7, 9};
 uint8_t sckPin[4] = {10, 33, 6, 8};
-uint8_t csPin[4] = {25, 35, 27, 26};
+uint8_t csPin[4] = {24, 35, 27, 26};
 
 // Safety stop
 int stopCondition = 0;
@@ -287,10 +287,10 @@ void InitStuff() {
   piBR.SetOutputLimits(-maxCorrect, maxCorrect);
   piBL.SetOutputLimits(-maxCorrect, maxCorrect);
 
-  absEncoderFR.SetEncPositions(362, 1247, false);
-  absEncoderFL.SetEncPositions(3906, 3196, true);
-  absEncoderBR.SetEncPositions(1648, 544, true);
-  absEncoderBL.SetEncPositions(3901, 810, false);
+  absEncoderFR.SetEncPositions(158, 1276, false);
+  absEncoderFL.SetEncPositions(58, 3204, true);
+  absEncoderBR.SetEncPositions(1775, 461, true);
+  absEncoderBL.SetEncPositions(3721, 845, false);
 
 
 }
@@ -433,13 +433,13 @@ void loop() {
     // Print out absolute encoder data (Validation)
     if (absEncoderFlag == 1) {
       Serial.print("FR Pos: ");
-      Serial.print(absEncCurrentVelocity[0]);
+      Serial.print(absEncCurrentPosition[0]);
       Serial.print(" FL Pos: ");
-      Serial.print(absEncCurrentVelocity[1]);
+      Serial.print(absEncCurrentPosition[1]);
       Serial.print(" BR Pos: ");
-      Serial.print(absEncCurrentVelocity[2]);
+      Serial.print(absEncCurrentPosition[2]);
       Serial.print(" BL Pos: ");
-      Serial.println(absEncCurrentVelocity[3]);
+      Serial.println(absEncCurrentPosition[3]);
       // absEncPositionFromTopFR
       // Serial.print(" FR Abs Encoder Velocity: ");
       // Serial.println(absEncCurrentVelocityFR);

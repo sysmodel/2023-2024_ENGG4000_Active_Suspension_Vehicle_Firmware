@@ -24,13 +24,6 @@
 
 #include "AbsEncoders.h"
 
-// Define Variables
-// int32_t absEncoderPreviousPosition = 0;
-// int32_t absEncoderPosition = 0;
-// unsigned long absEncoderLastTime = micros();
-// unsigned long absEncoderTime = 0;
-// volatile double absEncoderVel = 0.0;
-
 // Actual constructor
 AbsEnc::AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution)
 {
