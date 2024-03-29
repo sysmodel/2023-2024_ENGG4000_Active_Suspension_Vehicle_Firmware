@@ -27,7 +27,6 @@
 #include "PID_v1.h"
 #include "Waveforms.h"
 #include "SafetyStop.h"
-#include "VCNL4040.h"
 #include "BNO08x.h"
 
 //------------------------------------------------------------------
@@ -111,10 +110,6 @@ PID piFL(&currentPI[1], &outPI[1], &setIPI[1], Kp, Ki, Kd, DIRECT);
 PID piBR(&currentPI[2], &outPI[2], &setIPI[2], Kp, Ki, Kd, DIRECT);
 PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
-// Create IR sensor object
-VCNL4040IR vcnl4040 = VCNL4040IR();
-double carHeight = 0.0;
-
 // Create IMU object and corresponding global variables
 BNO08xIMU bno08x = BNO08xIMU();
 sh2_SensorValue_t gyroValue;
@@ -127,6 +122,12 @@ float accelerationZ;
 float gyroRoll;
 float gyroPitch;
 int FlagIMU = 0;
+
+// Code for steering measurement 
+uint8_t steeringPin = A4;
+int steeringAngle;
+unsigned int rawSteerData;
+unsigned int convertedSteeringData;
 
 //------------------------------------------------------------------
 
@@ -207,6 +208,13 @@ void GetDataIMU()
   FlagIMU = 1;
 }
 
+void GetSteeringAngle()
+{
+  rawSteerData = analogRead(steeringPin);
+  convertedSteeringData = map(rawSteerData, 0, 1023, 0, 3300);
+  steeringAngle = map(convertedSteeringData, 1250, 2260, -30, 30);
+}
+
 void InitStuff() {
   // Initialize serial communication at 115200 bps
   Serial.begin(115200);
@@ -224,6 +232,8 @@ void InitStuff() {
   pinMode(STOP_SWITCH_PIN_OUT, OUTPUT); // high pin will passed/stopped by switch
   pinMode(STOP_SWITCH_PIN_IN, INPUT); // input pin to read switch output
   digitalWrite(STOP_SWITCH_PIN_OUT, HIGH);
+
+  pinMode(steeringPin, INPUT);
 
   // IMU Setup
   bno08x.BeginBNO08x();
@@ -270,17 +280,10 @@ void InitStuff() {
   piBR.SetOutputLimits(-maxCorrect, maxCorrect);
   piBL.SetOutputLimits(-maxCorrect, maxCorrect);
 
-  absEncoderFR.SetEncPositions(362, 1247, false);
-  absEncoderFL.SetEncPositions(3906, 3196, true);
-  absEncoderBR.SetEncPositions(1648, 544, true);
-  absEncoderBL.SetEncPositions(3901, 810, false);
-
-
-}
-
-void GetIRData()
-{
-  carHeight = vcnl4040.GetDistance();
+  absEncoderFR.SetEncPositions(158, 1276, false);
+  absEncoderFL.SetEncPositions(58, 3204, true);
+  absEncoderBR.SetEncPositions(1775, 461, true);
+  absEncoderBL.SetEncPositions(3721, 845, false);
 }
 
 void CCUpdatePWM() {
@@ -398,6 +401,7 @@ void setup() {
   // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
   // Timer5.attachInterrupt(CheckStop).start(1000000);
   Timer6.attachInterrupt(GetDataIMU).start(30303);
+  Timer7.attachInterrupt(GetSteeringAngle).start(30303);
 }
 
 void loop() {
