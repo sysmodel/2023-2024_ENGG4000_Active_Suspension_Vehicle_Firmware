@@ -25,20 +25,8 @@
 
 #include <Arduino.h>
 
-// Stop condition codes
-#define BATT_VOLTAGE_TOO_LOW 1
-#define FR_CURRENT_TOO_HIGH 2
-#define FL_CURRENT_TOO_HIGH 3
-#define BR_CURRENT_TOO_HIGH 4
-#define BL_CURRENT_TOO_HIGH 5
-#define FR_ABSENC_TOO_FAR 6
-#define FL_ABSENC_TOO_FAR 7
-#define BR_ABSENC_TOO_FAR 8
-#define BL_ABSENC_TOO_FAR 9
-#define MANUAL_STOP 10
 
-
-bool CheckStopCondition(float *cellVolt, float *curr, double *encPos, bool sw);
+int CheckStopCondition(float cellVolt[2], float curr[4]);
 
 
 #endif // SAFETYSTOP_H

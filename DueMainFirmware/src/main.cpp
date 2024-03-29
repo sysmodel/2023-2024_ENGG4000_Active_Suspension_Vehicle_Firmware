@@ -32,11 +32,8 @@
 //------------------------------------------------------------------
 
 #define led LED_BUILTIN
-#define steerPotPin A4
-#define battCell1Pin A3
+#define battCell1Pin A0
 #define battCell2Pin A2
-#define STOP_SWITCH_PIN_OUT 30
-#define STOP_SWITCH_PIN_IN 31
 
 //------------------------------------------------------------------
 
@@ -87,8 +84,34 @@ uint8_t csPin[4] = {25, 35, 27, 26};
 
 // Safety stop
 int stopCondition = 0;
+int lastLastStopCondition = 0;
 int lastStopCondition = 0;
-bool switchStatus = false;
+int tempStopCondition = 0;
+
+// Demo setpoints
+String demoName;
+float jumpSetI[10] = {0,0,0,0,0,0,0,-12,-12,14};
+int jsi = 0;
+int amplitude = 6;
+float phase[4] = {0,0.25,0.75,0.5};
+
+// IMU (BNO08x) variables
+sh2_SensorValue_t gyroValue;
+sh2_SensorValue_t linearAccelValue;
+sh2_SensorValue_t pitchAndRollValue;
+float pitch;
+float roll;
+float yaw;
+float accelerationZ;
+float gyroRoll;
+float gyroPitch;
+int FlagIMU = 0;
+
+// Code for steering measurement 
+uint8_t steeringPin = A4;
+int steeringAngle;
+unsigned int rawSteerData;
+unsigned int convertedSteeringData;
 
 //------------------------------------------------------------------
 
@@ -110,24 +133,8 @@ PID piFL(&currentPI[1], &outPI[1], &setIPI[1], Kp, Ki, Kd, DIRECT);
 PID piBR(&currentPI[2], &outPI[2], &setIPI[2], Kp, Ki, Kd, DIRECT);
 PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
-// Create IMU object and corresponding global variables
+// Create IMU object
 BNO08xIMU bno08x = BNO08xIMU();
-sh2_SensorValue_t gyroValue;
-sh2_SensorValue_t linearAccelValue;
-sh2_SensorValue_t pitchAndRollValue;
-float pitch;
-float roll;
-float yaw;
-float accelerationZ;
-float gyroRoll;
-float gyroPitch;
-int FlagIMU = 0;
-
-// Code for steering measurement 
-uint8_t steeringPin = A4;
-int steeringAngle;
-unsigned int rawSteerData;
-unsigned int convertedSteeringData;
 
 //------------------------------------------------------------------
 
@@ -147,16 +154,16 @@ void GetCurrent() {
   for(int i=0;i<4;i++) {
     switch(i) {
       case 0:
-        current[i] = (ina260FR.readCurrent() - offset[i])/1000.0;
+        current[i] = ina260FR.readCurrent()/1000.0;
         break;
       case 1:
-        current[i] = (ina260FL.readCurrent() - offset[i])/1000.0;
+        current[i] = ina260FL.readCurrent()/1000.0;
         break;
       case 2:
-        current[i] = (ina260BR.readCurrent() - offset[i])/1000.0;
+        current[i] = ina260BR.readCurrent()/1000.0;
         break;
       case 3:
-        current[i] = (ina260BL.readCurrent() - offset[i])/1000.0;
+        current[i] = ina260BL.readCurrent()/1000.0;
         break;
     }
     current[i] = 1.0887*current[i];
@@ -226,14 +233,9 @@ void InitStuff() {
     pinMode(mdIn1Pins[i], OUTPUT);
     pinMode(mdIn2Pins[i], OUTPUT);
   }
-  pinMode(steerPotPin, INPUT);  // steering potentiometer pin
   pinMode(battCell1Pin, INPUT); // pin of voltage sensor measuring battery cell #1
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
-  pinMode(STOP_SWITCH_PIN_OUT, OUTPUT); // high pin will passed/stopped by switch
-  pinMode(STOP_SWITCH_PIN_IN, INPUT); // input pin to read switch output
-  digitalWrite(STOP_SWITCH_PIN_OUT, HIGH);
-
-  pinMode(steeringPin, INPUT);
+  pinMode(steeringPin, INPUT); // pin of potentiometer hooked up to steering mechanism
 
   // IMU Setup
   bno08x.BeginBNO08x();
@@ -322,32 +324,25 @@ void ActuateAction() {
   }
 }
 
-void SineInput() {
-  // for(i=0;i<4;i++) {
-  //   setI[i] = float(int(waveformsTable[0][sineCount+i*5]-1000))/800;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
-  // }
-  // // setI[0] = int(waveformsTable[0][sineCount]);
-  // // setI[1] = int(waveformsTable[0][sineCount+5]);
-  // // setI[2] = int(waveformsTable[0][sineCount+10]);
-  // // setI[3] = int(waveformsTable[0][sineCount+15]);
-  // sineCount++;
-  // if((sineCount+i*5) >= maxSamplesNum) {sineCount = 0;}
+void DemoSetpoints() {
+
+  // setI[0] = jumpSetI[jsi];
+  // setI[1] = jumpSetI[jsi];
+  // setI[2] = jumpSetI[jsi];
+  // setI[3] = jumpSetI[jsi];
+  // jsi++;
+  // if (jsi > 9) {jsi = 0;}
+
+
+  // setI[0] = -5;
+  // setI[1] = -5;
+  // setI[2] = -5;
+  // setI[3] = -5;
 
   // for(i=0;i<4;i++) {
-  //   setI[i] = -1*sineCount+i/2;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
+  //   setI[i] = amplitude * sin(0.75 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
   // }
-  // sineCount++;
-  // if(sineCount>4) {sineCount=0;}
-  setI[0] = -10;
-  setI[1] = 0;
-  setI[2] = 0;
-  setI[3] = 0;
-  // for(int i=0;i<4;i++) {
-  //   desDirec[i] = 0;
-  //   SetDirec(i,desDirec[i]);
-  // }
+
 }
 
 void SendDataFunc()
@@ -373,12 +368,13 @@ void SendDataFunc()
 }
 
 void CheckStop() {
-  if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
-    switchStatus = true;
-  } else {
-    switchStatus = false;
+  lastLastStopCondition = lastStopCondition;
+  lastStopCondition = tempStopCondition;
+  tempStopCondition = CheckStopCondition(voltArray, current);
+  if ((lastLastStopCondition == lastStopCondition) && (lastStopCondition == tempStopCondition))
+  {
+    stopCondition = tempStopCondition;
   }
-  switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), (double*)&(absEncCurrentPosition[0]), switchStatus);
 }
 
 //------------------------------------------------------------------
@@ -398,9 +394,8 @@ void setup() {
   // Initialize Timmer Interupts for 33Hz
   Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  // Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
-  // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
-  // Timer5.attachInterrupt(CheckStop).start(1000000);
+  Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
+  Timer5.attachInterrupt(CheckStop).start(500000);
   Timer6.attachInterrupt(GetDataIMU).start(30303);
   Timer7.attachInterrupt(GetSteeringAngle).start(30303);
 }
@@ -422,24 +417,20 @@ void loop() {
 
     delay(100);
 
-  } else if (stopCondition == MANUAL_STOP) {
-    // do stuff
-    for(i=0;i<4;i++) {
-      analogWrite(pwm[i],0);
-      SetDirec(i,0);
-    }
-    Serial.print("Manual stop condition. Code: ");
-    Serial.print(stopCondition);
-    Serial.println();
   } else {
-    // do stuff
+    Timer3.stop();
     for(i=0;i<4;i++) {
-      analogWrite(pwm[i],0);
+      analogWrite(mdEnPins[i],0);
       SetDirec(i,0);
     }
-    Serial.print("Auto stop condition. Code: ");
-    Serial.print(stopCondition);
-    Serial.println();
+
+    // // Print fault code; comment out this section if printing is not desired
+    // Serial.print("Stop condition identified. Code: ");
+    // Serial.print(stopCondition);
+    // Serial.print(".");
+    // Serial.println();
+    // Serial.println("Stopped. Must restart.");
+
     while(1);
     // If a limit is crossed, one should check the serial log.
     // The only way to get out of an auto stop is to restart the program.
