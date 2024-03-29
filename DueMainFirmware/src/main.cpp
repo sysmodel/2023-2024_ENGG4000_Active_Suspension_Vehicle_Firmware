@@ -367,7 +367,8 @@ void SendDataFunc()
   Serial.print(yaw,2);Serial.print(","); 
   Serial.print(accelerationZ,2);Serial.print(","); 
   Serial.print(gyroRoll,2);Serial.print(","); 
-  Serial.print(gyroPitch,2);
+  Serial.print(gyroPitch,2);Serial.print(","); 
+  Serial.print(steeringAngle, 2);
   Serial.println("}");
 }
 
