@@ -27,8 +27,8 @@
 #include "PID_v1.h"
 #include "Waveforms.h"
 #include "SafetyStop.h"
-#include "VCNL4040.h"
 #include "BNO08x.h"
+#include "SteeringAngle.h"
 
 //------------------------------------------------------------------
 
@@ -111,10 +111,6 @@ PID piFL(&currentPI[1], &outPI[1], &setIPI[1], Kp, Ki, Kd, DIRECT);
 PID piBR(&currentPI[2], &outPI[2], &setIPI[2], Kp, Ki, Kd, DIRECT);
 PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
-// Create IR sensor object
-VCNL4040IR vcnl4040 = VCNL4040IR();
-double carHeight = 0.0;
-
 // Create IMU object and corresponding global variables
 BNO08xIMU bno08x = BNO08xIMU();
 sh2_SensorValue_t gyroValue;
@@ -126,6 +122,13 @@ float accelerationZ;
 float gyroRoll;
 float gyroPitch;
 int FlagIMU = 0;
+
+// Create global variable and object for steering angle
+uint8_t steeringPin = A4;
+int steeringAngle;
+unsigned int rawSteerData;
+unsigned int convertedSteeringData;
+SteeringPOT steerPot(steeringPin);
 
 //------------------------------------------------------------------
 
@@ -205,6 +208,13 @@ void GetDataIMU()
   FlagIMU = 1;
 }
 
+void GetSteeringAngle()
+{
+  rawSteerData = analogRead(A4);
+  convertedSteeringData = map(rawSteerData, 0, 1023, 0, 3300);
+  steeringAngle = map(convertedSteeringData, 1250, 2260, -30, 30);
+}
+
 void InitStuff() {
   // Initialize serial communication at 115200 bps
   Serial.begin(115200);
@@ -232,6 +242,9 @@ void InitStuff() {
   // IMU Setup
   bno08x.BeginBNO08x();
   bno08x.SetReports();
+
+  // Steering POT setup
+  steerPot.initSteeringPOT();
 
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
@@ -280,11 +293,6 @@ void InitStuff() {
   absEncoderBL.SetEncPositions(3901, 810, false);
 
 
-}
-
-void GetIRData()
-{
-  carHeight = vcnl4040.GetDistance();
 }
 
 void CCUpdatePWM() {
@@ -376,12 +384,12 @@ void setup() {
 
   // Initialize Timmer Interupts for 33Hz
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  //Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
   //Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
-  // Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
   //Timer5.attachInterrupt(CheckStop).start(1000000);
   //Timer6.attachInterrupt(GetIRData).start(100000);
-  Timer7.attachInterrupt(GetDataIMU).start(30303);
+  //Timer7.attachInterrupt(GetDataIMU).start(30303);
+  Timer8.attachInterrupt(GetSteeringAngle).start(30303);
 }
 
 void loop() {
@@ -391,23 +399,24 @@ void loop() {
 
     timeCount = millis();
 
-    
+    // Serial.print("Steering Angle: ");
+    // Serial.println(steeringAngle);
   
-    Serial.print("Pitch: ");
-    Serial.print(pitch);
-    Serial.print(" Pitch Offset: ");
-    Serial.print(bno08x._imuCAL._pitchOffset);
-    Serial.print(" Roll: ");
-    Serial.print(roll);
-    Serial.print(" Roll Offset: ");
-    Serial.print(bno08x._imuCAL._rollOffset);
-    Serial.print(" Pitch Rate: ");
-    Serial.print(gyroPitch);
-    Serial.print(" Roll Rate: ");
-    Serial.print(gyroRoll);
-    Serial.print(" Z - Acc: ");
-    Serial.println(accelerationZ);
-    FlagIMU = 0;
+    // Serial.print("Pitch: ");
+    // Serial.print(pitch);
+    // Serial.print(" Pitch Offset: ");
+    // Serial.print(bno08x._imuCAL._pitchOffset);
+    // Serial.print(" Roll: ");
+    // Serial.print(roll);
+    // Serial.print(" Roll Offset: ");
+    // Serial.print(bno08x._imuCAL._rollOffset);
+    // Serial.print(" Pitch Rate: ");
+    // Serial.print(gyroPitch);
+    // Serial.print(" Roll Rate: ");
+    // Serial.print(gyroRoll);
+    // Serial.print(" Z - Acc: ");
+    // Serial.println(accelerationZ);
+    // FlagIMU = 0;
   
 
     /*
