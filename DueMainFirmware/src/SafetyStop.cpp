@@ -28,7 +28,7 @@
 int stopCode = 0;
 float cellVoltLowLimit = 3.4; // in V, true low limit of battery is 3.2V/cell (6.4V)
 float currentHighLimit = 10; // administrative limit for high current
-int absEncPosLimits[4] = {0,0,0,0}; // absolute encoder limits
+double absEncPosLimits[4] = {0,0,0,0}; // absolute encoder limits
 byte j = 0; // variable for indexing
 
 
