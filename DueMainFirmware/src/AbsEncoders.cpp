@@ -25,11 +25,11 @@
 #include "AbsEncoders.h"
 
 // Define Variables
-int32_t absEncoderPreviousPosition = 0;
-int32_t absEncoderPosition = 0;
-unsigned long absEncoderLastTime = micros();
-unsigned long absEncoderTime = 0;
-volatile double absEncoderVel = 0.0;
+// int32_t absEncoderPreviousPosition = 0;
+// int32_t absEncoderPosition = 0;
+// unsigned long absEncoderLastTime = micros();
+// unsigned long absEncoderTime = 0;
+// volatile double absEncoderVel = 0.0;
 
 // Actual constructor
 AbsEnc::AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution)
@@ -50,6 +50,36 @@ void AbsEnc::initAbsEnc()
     pinMode(_sdoPin, INPUT);
 }
 
+// Set encoder positions 
+void AbsEnc::SetEncPositions(int encMinReading, int encMaxReading, bool CW)
+{
+    _encMinReading = encMinReading;
+    _encMaxReading = encMaxReading; 
+    _CW = CW;
+    if (_CW)
+    {
+        if(_encMinReading > encMaxReading)
+        {
+            _switchPoint = (_encMinReading + _encMaxReading) / 2;
+        }
+        else
+        {
+            _switchPoint = (_encMaxReading - 4095 + _encMinReading) / 2;
+        }
+    }
+    else 
+    {
+        if (_encMinReading > encMaxReading)
+        {
+            _switchPoint = (_encMinReading - 4095 + _encMaxReading) / 2;
+        }
+        else 
+        {
+           _switchPoint = (_encMaxReading + _encMinReading) / 2; 
+        }
+    }
+    
+}
 uint16_t AbsEnc::AbsEncPos()
 {
     noInterrupts();
@@ -112,26 +142,72 @@ uint16_t AbsEnc::AbsEncPos()
     
 }
 
+double AbsEnc::GetRackPosition()
+{
+    if (_encMinReading == NULL)
+    {
+        Serial.println("SetEncPositions Not Called!");
+        exit(0);
+    }
+
+    _currentPosition = AbsEncPos();
+
+    if (_CW)
+    {
+        if (_encMaxReading > _encMinReading)
+        {
+            return double(_currentPosition - _encMinReading) * _pulseToDistance;
+        }
+        else 
+        {
+            if (_currentPosition < _switchPoint)
+            {
+                return double((4095.0 - _encMinReading) + _currentPosition) * _pulseToDistance;
+            }
+            else 
+            {
+                return double(_currentPosition - _encMinReading) * _pulseToDistance;
+            }
+        }
+    }
+    else 
+    {
+        if (_encMinReading > _encMaxReading)
+        {
+            return double(_encMinReading - _currentPosition) * _pulseToDistance;
+        }
+        else
+        {
+            if (_currentPosition < _switchPoint)
+            {
+                return double( _encMinReading - _currentPosition) * _pulseToDistance;
+            }
+            else 
+            {
+                return double(_encMinReading + (4095 - _currentPosition)) * _pulseToDistance;
+            }
+        }
+    }
+} 
+
+
 double AbsEnc::AbsEncVel() 
 {
-    absEncoderPosition = AbsEncPos();
-    absEncoderTime = micros();
+    _absEncoderPosition = GetRackPosition();
+    _absEncoderTime = micros();
 
-    double deltaPosition = absEncoderPosition - absEncoderPreviousPosition;
+    double deltaPosition = _absEncoderPosition - _absEncoderPreviousPosition;
 
-    /* Need to convert position to anglular or linear result */
+    double deltaTime = (_absEncoderTime - _absEncoderLastTime) / 1e6;
+    double _absEncoderVelocity = deltaPosition / deltaTime; 
 
-    double deltaTime = (absEncoderTime - absEncoderLastTime) / 1000;
-    double velocity = deltaPosition / deltaTime; 
+    _absEncoderPreviousPosition = _absEncoderPosition;
+    _absEncoderLastTime = _absEncoderTime;
 
-    absEncoderPreviousPosition = absEncoderPosition;
-    absEncoderLastTime = absEncoderTime;
-
-    return velocity;
+    return _absEncoderVelocity;
 }
 
 void AbsEnc::DelayNOP()
 {
     _varNOP ++;
 }
-

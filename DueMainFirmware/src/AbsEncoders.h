@@ -36,11 +36,17 @@ class AbsEnc
         // Actual constructor
         AbsEnc(uint8_t sckPin, uint8_t csPin, uint8_t sdoPin, uint8_t resolution);
 
+        // Initialize encoder positions
+        void SetEncPositions(int encMinReading, int encMaxReading, bool CW);
+
         // Initialize pins
         void initAbsEnc();
 
         // Get position 
         uint16_t AbsEncPos();
+
+        // Get rack position
+        double GetRackPosition();
 
         //Get velocity
         double AbsEncVel();
@@ -52,6 +58,19 @@ class AbsEnc
         uint8_t _sdoPin;
         uint8_t _resolution;
         uint32_t _varNOP = 0;
+        int _encMinReading = NULL;
+        int _encMaxReading;
+        bool _CW;
+        double _pulseToDistance = 0.0098; // mm per pulse
+        double _switchPoint; 
+        uint16_t _currentPosition;
+
+        // Velocity Variables
+        double _absEncoderPreviousPosition = 0;
+        double _absEncoderPosition = 0;
+        unsigned long _absEncoderLastTime = micros();
+        unsigned long _absEncoderTime = 0;
+        double _absEncoderVelocity = 0.0;
 
         // NOP delay function
         void DelayNOP();

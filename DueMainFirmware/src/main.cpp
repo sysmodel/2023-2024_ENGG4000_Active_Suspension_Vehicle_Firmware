@@ -25,7 +25,13 @@
 #include "AbsEncoders.h"
 #include "Adafruit_INA260.h"
 #include "PID_v1.h"
-#include "Waveforms.h"
+#include "BNO08x.h"
+
+//------------------------------------------------------------------
+
+#define led LED_BUILTIN
+#define battCell1Pin A0
+#define battCell2Pin A2
 
 //------------------------------------------------------------------
 
@@ -33,6 +39,8 @@
 #define steerPotPin A4
 #define battCell1Pin A3
 #define battCell2Pin A2
+#define STOP_SWITCH_PIN_OUT 30
+#define STOP_SWITCH_PIN_IN 31
 
 //------------------------------------------------------------------
 
@@ -45,6 +53,7 @@ float battVoltage = 0;
 long timeCount = millis();
 int sineCount = 0;
 int funcTime = 0;
+int currentFlag = 0;
 
 // Motor driver
 uint32_t mdEnPins[4] = {4,5,2,3};
@@ -55,11 +64,11 @@ bool direc[4] = {0,0,0,0}; // motor action directions; 1 is up, 0 is down
 bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is down
 
 // Jetson communication
-float setI[4] = {-8,-8,-2,-2}; // array of stored current setpoints
+float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
-float resistance = 0.663; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=10, Ki=200, Kd=0;  // specify PID tuning parameters
+float resistance[4] = {0.372,0.301,0.310,0.325}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
+double Kp=0, Ki=400, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
@@ -73,18 +82,29 @@ uint8_t quadEncoderFlag = 0;
 uint8_t absEncoderFlag = 0;
 uint8_t resolution = 12;
 // - Define global variable to store abs encoder positions and speeds
-uint16_t absEncCurrentPositionFR; // Front Right
-uint16_t absEncCurrentPositionFL; // Front Left
-uint16_t absEncCurrentPositionBR; // Back Right
-uint16_t absEncCurrentPositionBL; // Back Left
-double absEncCurrentVelocityFR; // Front Right
-double absEncCurrentVelocityFL; // Front Left
-double absEncCurrentVelocityBR; // Back Right
-double absEncCurrentVelocityBL; // Back Left
+double absEncCurrentPosition[4] = {0,0,0,0}; // array of absolute encoder positions
+double absEncCurrentVelocity[4] = {0,0,0,0}; // array of absolute encoder velocities
 // - Define pins for each encoder; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
-uint8_t sdoPin[4] = {11, 13, 7, 9};
-uint8_t sckPin[4] = {10, 12, 6, 8};
-uint8_t csPin[4] = {25, 24, 27, 26};
+uint8_t sdoPin[4] = {11, 31, 7, 9};
+uint8_t sckPin[4] = {10, 33, 6, 8};
+uint8_t csPin[4] = {25, 35, 27, 26};
+
+// Safety stop
+int stopCondition = 0;
+int lastStopCondition = 0;
+bool switchStatus = false;
+
+// Demo setpoints
+String demoName = "Front2Back"; // Options: Around, Bounce, Left2Right, Front2Back
+float jumpSetI[10] = {0,0,0,0,0,-10,-10,12};
+int jsi = 0;
+int amplitude = 6;
+float phase[4] = {0,0.25,0.75,0.5};
+float phaseL2R[4] = {0,0.5,0,0.5};
+float phaseF2B[4] = {0,0,0.5,0.5};
+int bounceTime;
+float frequency = 0.75;
+float frequency2 = 1.25;
 
 //------------------------------------------------------------------
 
@@ -106,13 +126,40 @@ PID piFL(&currentPI[1], &outPI[1], &setIPI[1], Kp, Ki, Kd, DIRECT);
 PID piBR(&currentPI[2], &outPI[2], &setIPI[2], Kp, Ki, Kd, DIRECT);
 PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
+// Create IMU object and corresponding global variables
+BNO08xIMU bno08x = BNO08xIMU();
+sh2_SensorValue_t gyroValue;
+sh2_SensorValue_t linearAccelValue;
+sh2_SensorValue_t pitchAndRollValue;
+float pitch;
+float roll;
+float yaw;
+float accelerationZ;
+float gyroRoll;
+float gyroPitch;
+int FlagIMU = 0;
+
+
+// Code for steering measurement 
+uint8_t steeringPin = A4;
+int steeringAngle;
+unsigned int rawSteerData;
+unsigned int convertedSteeringData;
+
 //------------------------------------------------------------------
 
+
+
+//------------------------------------------------------------------
+void DemoSetpoints();
+
 void SetDirec(int wheel, bool dir) {
-  if (dir == 1) {
-    digitalWrite(mdIn1Pins[wheel], LOW);
+  digitalWrite(mdIn1Pins[wheel], HIGH);
+  digitalWrite(mdIn2Pins[wheel], HIGH);
+  if (dir == 1) { // car up
     digitalWrite(mdIn2Pins[wheel], HIGH);
-  } else if (dir == 0) {
+    digitalWrite(mdIn1Pins[wheel], LOW);
+  } else if (dir == 0) { // car down
     digitalWrite(mdIn1Pins[wheel], HIGH);
     digitalWrite(mdIn2Pins[wheel], LOW);
   }
@@ -122,25 +169,21 @@ void GetCurrent() {
   for(int i=0;i<4;i++) {
     switch(i) {
       case 0:
-        current[i] = float(ina260FR.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260FR.readCurrent() - offset[i])/1000.0;
+        break;
       case 1:
-        current[i] = float(ina260FL.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260FL.readCurrent() - offset[i])/1000.0;
+        break;
       case 2:
-        current[i] = float(ina260BR.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260BR.readCurrent() - offset[i])/1000.0;
+        break;
       case 3:
-        current[i] = float(ina260BL.readCurrent())/1000.0 - offset[i];
+        current[i] = (ina260BL.readCurrent() - offset[i])/1000.0;
+        break;
     }
-    if (current[i] < 0) {
-      current[i] = -current[i];
-      direc[i] = 0;
-      // current[i] = 1.0637*current[i] + 0.1416;
-      // current[i] = -current[i];
-    } else {
-      direc[i] = 1;
-      // current[i] = 1.0637*current[i] + 0.1416;
-    }
-    current[i] = 1.0637*current[i] + 0.1416;
+    current[i] = 1.0887*current[i];
   }
+  currentFlag = 1;
 }
 
 void GetVoltage() {
@@ -159,19 +202,39 @@ void GetQuadEncoderData() {
 
 void GetAbsEncoderData() {
   // Get the positions from each abs encoder
-  absEncCurrentPositionFR = absEncoderFR.AbsEncPos();
-  absEncCurrentPositionFL = absEncoderFL.AbsEncPos();
-  absEncCurrentPositionBR = absEncoderBR.AbsEncPos();
-  absEncCurrentPositionBL = absEncoderBL.AbsEncPos();
+  absEncCurrentPosition[0] = absEncoderFR.GetRackPosition();
+  absEncCurrentPosition[1] = absEncoderFL.GetRackPosition();
+  absEncCurrentPosition[2] = absEncoderBR.GetRackPosition();
+  absEncCurrentPosition[3] = absEncoderBL.GetRackPosition();
 
   // Get the velocities from each abs encoder
-  absEncCurrentVelocityFR = absEncoderFR.AbsEncVel();
-  absEncCurrentVelocityFL = absEncoderFL.AbsEncVel();
-  absEncCurrentVelocityBR = absEncoderBR.AbsEncVel();
-  absEncCurrentVelocityBL = absEncoderBL.AbsEncVel();
+  absEncCurrentVelocity[0] = absEncoderFR.AbsEncVel();
+  absEncCurrentVelocity[1] = absEncoderFL.AbsEncVel();
+  absEncCurrentVelocity[2] = absEncoderBR.AbsEncVel();
+  absEncCurrentVelocity[3] = absEncoderBL.AbsEncVel();
 
   // Set flag to print this value in the loop()
   absEncoderFlag = 1;
+}
+
+void GetDataIMU()
+{
+  bno08x.GetDataIMU();
+  pitch = bno08x._ypr._pitch - bno08x._imuCAL._pitchOffset;
+  roll = bno08x._ypr._roll - bno08x._imuCAL._rollOffset;
+  yaw = bno08x._ypr._yaw - bno08x._imuCAL._yawOffsest;
+  gyroPitch = bno08x._rpRates._pitchRate;
+  gyroRoll = bno08x._rpRates._rollRate;
+  accelerationZ = bno08x._rpRates._zAcc;
+
+  FlagIMU = 1;
+}
+
+void GetSteeringAngle()
+{
+  rawSteerData = analogRead(steeringPin);
+  convertedSteeringData = map(rawSteerData, 0, 1023, 0, 3300);
+  steeringAngle = map(convertedSteeringData, 1250, 2260, -30, 30);
 }
 
 void InitStuff() {
@@ -185,57 +248,68 @@ void InitStuff() {
     pinMode(mdIn1Pins[i], OUTPUT);
     pinMode(mdIn2Pins[i], OUTPUT);
   }
-  pinMode(steerPotPin, INPUT);  // steering potentiometer pin
+  pinMode(steeringPin, INPUT);  // steering potentiometer pin
   pinMode(battCell1Pin, INPUT); // pin of voltage sensor measuring battery cell #1
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
 
+  // IMU Setup
+  bno08x.BeginBNO08x();
+  bno08x.SetReports();
+
   // Begin current sensor reading and set averaging count
-  ina260FR.begin(0x41);
-  ina260FL.begin(0x44);
-  ina260BR.begin(0x45);
-  ina260BL.begin(0x40);
-  while (!ina260FR.begin()) {
+  if (!ina260FR.begin(0x41)) {
     Serial.println("Couldn't find INA260 chip (FR)");
-    // while (1);
+    while (1);
   }
-  while (!ina260FL.begin()) {
+  if (!ina260FL.begin(0x44)) {
     Serial.println("Couldn't find INA260 chip (FL)");
-    // while (1);
+    while (1);
   }
-  while (!ina260BR.begin()) {
+  if (!ina260BR.begin(0x45)) {
     Serial.println("Couldn't find INA260 chip (BR)");
     // while (1);
   }
-  while (!ina260BL.begin()) {
+  if (!ina260BL.begin(0x40)) {
     Serial.println("Couldn't find INA260 chip (BL)");
     // while (1);
   }
-  Serial.println("Found INA260 chip");
-  ina260FR.setAveragingCount(INA260_COUNT_4);
-  ina260FL.setAveragingCount(INA260_COUNT_4);
-  ina260BR.setAveragingCount(INA260_COUNT_4);
-  ina260BL.setAveragingCount(INA260_COUNT_4);
+  
+  ina260FR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260FL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260BR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260BL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
+  ina260FR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260FL.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BL.setCurrentConversionTime(INA260_TIME_2_116_ms);
 
   // Set PID mode, sampling time, and output limits
   piFR.SetMode(AUTOMATIC);
   piFL.SetMode(AUTOMATIC);
   piBR.SetMode(AUTOMATIC);
   piBL.SetMode(AUTOMATIC);
-  piFR.SetSampleTime(10);
-  piFL.SetSampleTime(10);
-  piBR.SetSampleTime(10);
-  piBL.SetSampleTime(10);
+  piFR.SetSampleTime(3);
+  piFL.SetSampleTime(3);
+  piBR.SetSampleTime(3);
+  piBL.SetSampleTime(3);
   piFR.SetOutputLimits(-maxCorrect, maxCorrect);
   piFL.SetOutputLimits(-maxCorrect, maxCorrect);
   piBR.SetOutputLimits(-maxCorrect, maxCorrect);
   piBL.SetOutputLimits(-maxCorrect, maxCorrect);
+
+  absEncoderFR.SetEncPositions(362, 1247, false);
+  absEncoderFL.SetEncPositions(3906, 3196, true);
+  absEncoderBR.SetEncPositions(1648, 544, true);
+  absEncoderBL.SetEncPositions(3901, 810, false);
+
+
 }
 
 void CCUpdatePWM() {
   for(int i=0;i<4;i++) {
     setIPI[i] = setI[i];
     currentPI[i] = current[i];
-    setV[i] = resistance * setI[i];
+    setV[i] = resistance[i] * setI[i];
     pwmOffset[i] = int(setV[i] / battVoltage * 255.0); // Feedforward (FF) control
   }
   piFR.Compute();
@@ -244,48 +318,103 @@ void CCUpdatePWM() {
   piBL.Compute();
   for(int i=0;i<4;i++) {
     pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
+    if(pwm[i] < 0) {
+      pwm[i] = -pwm[i];
+      desDirec[i] = 0;
+    } else {
+      desDirec[i] = 1;
+    }
+    if (direc[i] != desDirec[i]) {SetDirec(i,desDirec[i]); direc[i] = desDirec[i];}
     if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
     analogWrite(mdEnPins[i], pwm[i]);
-    if(direc[i]!=desDirec[i]) {
-      direc[i] = desDirec[i];
-      SetDirec(i,direc[i]);
-    }
   }
 }
 
 void ActuateAction() {
+  noInterrupts();
   // This function calls on independent functions to read the current and ...
-  // ... compute the FF-PI controller to actuate a PWM accordingly.
-  funcTime = micros();
-  GetCurrent();
-  CCUpdatePWM();
-  funcTime = micros() - funcTime;
+  // ... compute the FF-I controller to actuate a PWM accordingly.
+  if (stopCondition == 0) {
+     // This function calls on independent functions to read the current and ...
+  // ... compute the FF-I controller to actuate a PWM accordingly.
+  if (stopCondition == 0) {
+    funcTime = micros();
+
+    DemoSetpoints();
+
+    GetCurrent();
+    CCUpdatePWM();
+    funcTime = micros() - funcTime;
+  }
+  }
+  interrupts();
 }
 
-void SineInput() {
-  // for(i=0;i<4;i++) {
-  //   setI[i] = float(int(waveformsTable[0][sineCount+i*5]-1000))/800;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
-  // }
-  // // setI[0] = int(waveformsTable[0][sineCount]);
-  // // setI[1] = int(waveformsTable[0][sineCount+5]);
-  // // setI[2] = int(waveformsTable[0][sineCount+10]);
-  // // setI[3] = int(waveformsTable[0][sineCount+15]);
-  // sineCount++;
-  // if((sineCount+i*5) >= maxSamplesNum) {sineCount = 0;}
+void DemoSetpoints() {
 
-  // for(i=0;i<4;i++) {
-  //   setI[i] = -1*sineCount+i/2;
-  //   if(setI[i] < 0) {setI[i] = -setI[i]; desDirec[i] = 0;} else {desDirec[i] = 1;}
-  // }
-  // sineCount++;
-  // if(sineCount>4) {sineCount=0;}
-  setI[0] = 0;
-  setI[1] = 0;
-  setI[2] = 10;
-  setI[3] = 10;
-  for(int i=0;i<4;i++) {desDirec[i] = 0;}
+  if (demoName == "Around") {
+
+    for(i=0;i<4;i++) {
+      setI[i] = amplitude * sin(frequency * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+    }
+
+  } else if (demoName == "Bounce") {
+
+    for(i=0;i<4;i++) {
+      setI[i] = jumpSetI[jsi];
+    }
+    if (funcTime - bounceTime >= 100000) {
+      bounceTime = funcTime;
+      jsi++;
+      if (jsi > 9) {jsi = 0;}
+    }
+
+  } else if (demoName == "Left2Right") {
+    
+    for(i=0;i<4;i++) {
+      setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseL2R[i]*2*PI);
+    }
+
+  } else if (demoName == "Front2Back") {
+    
+    for(i=0;i<4;i++) {
+      setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseF2B[i]*2*PI);
+    }
+
+  }
+ 
 }
+
+void SendDataFunc()
+{
+  Serial.print("{");
+  Serial.print(absEncCurrentPosition[0],2);Serial.print(","); 
+  Serial.print(absEncCurrentPosition[1],2);Serial.print(","); 
+  Serial.print(absEncCurrentPosition[2],2);Serial.print(","); 
+  Serial.print(absEncCurrentPosition[3],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[0],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[1],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[2],2);Serial.print(","); 
+  Serial.print(absEncCurrentVelocity[3],2);Serial.print(","); 
+  Serial.print(quadEncoderVel,2);Serial.print(","); 
+  Serial.print(pitch,2);Serial.print(","); 
+  Serial.print(roll,2);Serial.print(","); 
+  Serial.print(yaw,2);Serial.print(","); 
+  Serial.print(accelerationZ,2);Serial.print(","); 
+  Serial.print(gyroRoll,2);Serial.print(","); 
+  Serial.print(gyroPitch,2);Serial.print(","); 
+  Serial.print(steeringAngle);
+  Serial.println("}");
+}
+
+// void CheckStop() {
+//   if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
+//     switchStatus = true;
+//   } else {
+//     switchStatus = false;
+//   }
+//   switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), (double*)&(absEncCurrentPosition[0]), switchStatus);
+// }
 
 //------------------------------------------------------------------
 
@@ -297,62 +426,56 @@ void setup() {
   while (!Serial) {delay(1);}
 
   // setI[4] = {-8.0,-8.0,1.0,1.0};
-  for(int i=0;i<4;i++) {Serial.println(setI[i]);}
+  // for(int i=0;i<4;i++) {Serial.println(setI[i]);}
   for(int i=0;i<4;i++) {desDirec[i] = 0;}
   for(int i=0;i<4;i++) {SetDirec(i,0);}
 
   // Initialize Timmer Interupts for 33Hz
-  // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
-  Timer4.attachInterrupt(SineInput).start(5000000); // Timer for sinusoidal input to actuators
+  Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
+  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  Timer3.attachInterrupt(ActuateAction).start(500000); // Timer for ActuateAction function
+  // Timer5.attachInterrupt(CheckStop).start(1000000);
+  Timer6.attachInterrupt(GetDataIMU).start(30303);
+  Timer7.attachInterrupt(GetSteeringAngle).start(30303);
 }
 
 void loop() {
+  if (stopCondition == 0) {
+    GetVoltage();
 
-  GetVoltage();
+    // timeCount = millis();
 
-  timeCount = millis();
+    if (Serial.available())
+    {
+      while(Serial.available())
+      {
+        Serial.read();
+      }
+      SendDataFunc();
+    }
 
-  /*
-  // Print out quadrature encoder data (Validation)
-  if (quadEncoderFlag == 1) {
-    Serial.print("Quad Encoder Velocity (rad/s): ");
-    Serial.println(quadEncoderVel);
-    quadEncoderFlag = 0;
+    delay(100);
+
+  } else if (stopCondition == 300) {
+    // do stuff
+    for(i=0;i<4;i++) {
+      analogWrite(pwm[i],0);
+      SetDirec(i,0);
+    }
+    Serial.print("Manual stop condition. Code: ");
+    Serial.print(stopCondition);
+    Serial.println();
+  } else {
+    // do stuff
+    for(i=0;i<4;i++) {
+      analogWrite(pwm[i],0);
+      SetDirec(i,0);
+    }
+    Serial.print("Auto stop condition. Code: ");
+    Serial.print(stopCondition);
+    Serial.println();
+    while(1);
+    // If a limit is crossed, one should check the serial log.
+    // The only way to get out of an auto stop is to restart the program.
   }
-  */
-
-  // Print out absolute encoder data (Validation)
-  if (absEncoderFlag == 1) {
-    Serial.print("FR Abs Encoder Position: ");
-    Serial.print(absEncCurrentPositionFR);
-    Serial.print(" FR Abs Encoder Velocity: ");
-    Serial.println(absEncCurrentVelocityFR);
-    absEncoderFlag = 0;
-
-
-    // Independent of the abs. encoders but should print at the same time
-    Serial.print("Currents: ");
-    for(int i=0;i<4;i++) {Serial.print(current[i]); Serial.print(",");}
-    Serial.println("");
-  }
-
-  // Serial.print("Currents: ");
-  // for(i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-  // Serial.println("");
-  // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  // Serial.println("");
-  // Serial.print("Voltage: "); Serial.println(battVoltage,2);
-
-  Serial.println("Currents: ");
-  for(int i=0;i<4;i++) {Serial.print(current[i],3); Serial.print(",");}
-  // Serial.println("");
-  // for(i=0;i<4;i++) {Serial.print(setI[i],3); Serial.print(",");}
-  for(int i=0;i<4;i++) {Serial.print(setI[i]); Serial.print(",");}
-  Serial.print("--");
-  Serial.print("Voltage: "); Serial.print(battVoltage,2);
-  Serial.print(", "); Serial.println(funcTime);
-
-  delay(20);
 }
