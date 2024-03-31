@@ -112,6 +112,7 @@ void BNO08xIMU::GetDataIMU()
     }
   _imuCAL._pitchOffset = _sumPitch / _calibrationCount;
   _imuCAL._rollOffset = _sumRoll / _calibrationCount;
+  _imuCAL._yawOffsest = _sumYaw / _calibrationCount;
   
   _calibrationFlag = 0;
   }

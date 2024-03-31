@@ -219,7 +219,6 @@ void GetAbsEncoderData() {
 
 void GetDataIMU()
 {
-  noInterrupts();
   bno08x.GetDataIMU();
   pitch = bno08x._ypr._pitch - bno08x._imuCAL._pitchOffset;
   roll = bno08x._ypr._roll - bno08x._imuCAL._rollOffset;
@@ -229,7 +228,6 @@ void GetDataIMU()
   accelerationZ = bno08x._rpRates._zAcc;
 
   FlagIMU = 1;
-  interrupts();
 }
 
 void GetSteeringAngle()
