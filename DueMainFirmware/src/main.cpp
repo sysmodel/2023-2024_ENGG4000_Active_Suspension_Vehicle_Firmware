@@ -219,6 +219,7 @@ void GetAbsEncoderData() {
 
 void GetDataIMU()
 {
+  noInterrupts();
   bno08x.GetDataIMU();
   pitch = bno08x._ypr._pitch - bno08x._imuCAL._pitchOffset;
   roll = bno08x._ypr._roll - bno08x._imuCAL._rollOffset;
@@ -228,6 +229,7 @@ void GetDataIMU()
   accelerationZ = bno08x._rpRates._zAcc;
 
   FlagIMU = 1;
+  interrupts();
 }
 
 void GetSteeringAngle()
@@ -433,7 +435,7 @@ void setup() {
   // Initialize Timmer Interupts for 33Hz
   Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(500000); // Timer for ActuateAction function
+  //Timer3.attachInterrupt(ActuateAction).start(500000); // Timer for ActuateAction function
   // Timer5.attachInterrupt(CheckStop).start(1000000);
   Timer6.attachInterrupt(GetDataIMU).start(30303);
   Timer7.attachInterrupt(GetSteeringAngle).start(30303);
