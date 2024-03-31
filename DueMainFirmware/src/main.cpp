@@ -89,7 +89,7 @@ int lastStopCondition = 0;
 int tempStopCondition = 0;
 
 // Demo setpoints
-String demoName = "Front2Back"; // Options: Around, Bounce, Left2Right, Front2Back
+String demoName = "Around"; // Options: Around, Bounce, Left2Right, Front2Back
 float jumpSetI[10] = {0,0,0,0,0,-10,-10,12};
 int jsi = 0;
 int amplitude = 6;
@@ -204,12 +204,13 @@ void loop() {
       SetDirec(i,0);
     }
 
-    // // Print fault code; comment out this section if printing is not desired
-    // Serial.print("Stop condition identified. Code: ");
-    // Serial.print(stopCondition);
-    // Serial.print(".");
-    // Serial.println();
-    // Serial.println("Stopped. Must restart.");
+    // Print fault code; comment out this section if printing is not desired
+    Serial.print("Stop condition identified. Code: ");
+    Serial.print(stopCondition);
+    Serial.print(".");
+    Serial.println();
+    Serial.println("Stopped. Must restart.");
+    Serial.println(voltArray[0]);
 
     while(1);
     // If a limit is crossed, one should check the serial log.
