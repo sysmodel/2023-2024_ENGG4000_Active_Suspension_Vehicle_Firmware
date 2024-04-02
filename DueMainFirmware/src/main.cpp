@@ -95,7 +95,17 @@ int lastStopCondition = 0;
 bool switchStatus = false;
 
 // Demo setpoints
-String demoName = "Front2Back"; // Options: Around, Bounce, Left2Right, Front2Back
+// Enums of the demos to run. 
+enum demoOptions{
+  Around,
+  Bounce,
+  Left2Right,
+  Front2Back
+};
+
+// Select the demo to run
+demoOptions demo2run = Around;
+
 float jumpSetI[10] = {0,0,0,0,0,-10,-10,12};
 int jsi = 0;
 int amplitude = 6;
@@ -352,38 +362,35 @@ void ActuateAction() {
 
 void DemoSetpoints() {
 
-  if (demoName == "Around") {
-
-    for(i=0;i<4;i++) {
-      setI[i] = amplitude * sin(frequency * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
-    }
-
-  } else if (demoName == "Bounce") {
-
-    for(i=0;i<4;i++) {
-      setI[i] = jumpSetI[jsi];
-    }
-    if (funcTime - bounceTime >= 100000) {
-      bounceTime = funcTime;
-      jsi++;
-      if (jsi > 9) {jsi = 0;}
-    }
-
-  } else if (demoName == "Left2Right") {
-    
-    for(i=0;i<4;i++) {
-      setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseL2R[i]*2*PI);
-    }
-
-  } else if (demoName == "Front2Back") {
-    
-    for(i=0;i<4;i++) {
-      setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseF2B[i]*2*PI);
-    }
-
+  switch(demo2run){
+    case Around:
+      for(i=0;i<4;i++) {
+        setI[i] = amplitude * sin(frequency * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+      }
+      break;
+    case Bounce:
+      for(i=0;i<4;i++) {
+        setI[i] = jumpSetI[jsi];
+      }
+      if (funcTime - bounceTime >= 100000) {
+        bounceTime = funcTime;
+        jsi++;
+        if (jsi > 9) {jsi = 0;}
+      }
+      break;
+    case Left2Right:
+      for(i=0;i<4;i++) {
+        setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseL2R[i]*2*PI);
+      }
+      break;
+    case Front2Back:
+      for(i=0;i<4;i++) {
+        setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseF2B[i]*2*PI);
+      }
+      break;
   }
- 
 }
+
 
 void SendDataFunc()
 {
@@ -407,14 +414,14 @@ void SendDataFunc()
   Serial.println("}");
 }
 
-// void CheckStop() {
-//   if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
-//     switchStatus = true;
-//   } else {
-//     switchStatus = false;
-//   }
-//   switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), (double*)&(absEncCurrentPosition[0]), switchStatus);
-// }
+void CheckStop() {
+  if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
+    switchStatus = true;
+  } else {
+    switchStatus = false;
+  }
+  switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), (double*)&(absEncCurrentPosition[0]), switchStatus);
+}
 
 //------------------------------------------------------------------
 
@@ -433,8 +440,8 @@ void setup() {
   // Initialize Timmer Interupts for 33Hz
   Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  //Timer3.attachInterrupt(ActuateAction).start(500000); // Timer for ActuateAction function
-  // Timer5.attachInterrupt(CheckStop).start(1000000);
+  Timer3.attachInterrupt(ActuateAction).start(30303); // Timer for ActuateAction function
+  Timer5.attachInterrupt(CheckStop).start(500000);
   Timer6.attachInterrupt(GetDataIMU).start(30303);
   Timer7.attachInterrupt(GetSteeringAngle).start(30303);
 }
