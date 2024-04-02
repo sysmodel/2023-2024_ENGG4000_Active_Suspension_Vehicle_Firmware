@@ -38,8 +38,8 @@ bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is 
 float setI[4] = {0,0,0,0}; // array of stored current setpoints
 
 // FF-PI controller
-float resistance[4] = {0.663*(3/6.2)*(3/2.35)*(3/3.3),0.663,0.663,0.663}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
-double Kp=0, Ki=0, Kd=0;  // specify PID tuning parameters
+float resistance[4] = {0.372,0.301,0.310,0.325}; // in ohm; original value was 0.2234 ohm, but this was not reflected in the current control
+double Kp=0, Ki=400, Kd=0;  // specify PID tuning parameters
 double maxCorrect = 255; // used in piFR.SetOutputLimits() function
 double currentPI[4] = {0,0,0,0}; // array of current values to be used by the PI objects
 double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
@@ -67,7 +67,7 @@ uint8_t sckPin[4] = {10, 12, 6, 8};
 uint8_t csPin[4] = {25, 24, 27, 26};
 
 // Frequency testing
-uint8_t frequency = 1;
+uint8_t frequency = 30;
 
 //------------------------------------------------------------------
 
@@ -258,7 +258,7 @@ void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-PI controller to actuate a PWM accordingly.
   funcTime = micros();
-  //setI[0] = 6 * sin(frequency * 2 * PI * millis() / 1000.0);
+  setI[0] = 6 * sin(frequency * 2 * PI * millis() / 1000.0);
   GetCurrent();
   CCUpdatePWM();
   funcTime = micros() - funcTime;
@@ -266,60 +266,6 @@ void ActuateAction() {
   printToFile = true; 
 
   // Update frequency every 5 seconds
-  static unsigned long lastFrequencyChange = 0;
-  if (millis() - lastFrequencyChange >= 5000) {
-    switch (frequency) {
-      case 1:
-        frequency = 5;
-        break;
-      case 5:
-        frequency = 10;
-        break;
-      case 10:
-        frequency = 15;
-        break;
-      case 15:
-        frequency = 20;
-        break;
-      case 20:
-        frequency = 25;
-        break;
-      case 25:
-        frequency = 28;
-        break;
-      case 28:
-        frequency = 29;
-        break;
-      case 29:
-        frequency = 30;
-        break;
-      case 30:
-        frequency = 31;
-        break;
-      case 31:
-        frequency = 32;
-        break;
-      case 32:
-        frequency = 33;
-        break;
-      case 33:
-        frequency = 34;
-        break;
-      case 34:
-        frequency = 35;
-        break;
-      case 35:
-        frequency = 40;
-        break;
-      case 40:
-        frequency = 45;
-        break;
-      case 45:
-        frequency = 1; // Loop back to 1 Hz
-        break;
-    }
-    lastFrequencyChange = millis();
-  }
 }
 
 
@@ -422,7 +368,7 @@ void loop() {
     // Serial.print(",");
     // Serial.print(battVoltage, 2);
     Serial.print(",");
-    Serial.print(frequency);
+    Serial.print(setI[0]);
     Serial.println();
     printToFile = false;
   }
