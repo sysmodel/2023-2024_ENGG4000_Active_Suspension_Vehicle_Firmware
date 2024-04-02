@@ -33,6 +33,7 @@ uint32_t mdIn2Pins[4] = {50,52,46,48};
 int pwm[4] = {0,0,0,0};
 bool direc[4] = {0,0,0,0}; // motor action directions; 1 is up, 0 is down
 bool desDirec[4] = {0,0,0,0}; // desired motor action directions; 1 is up, 0 is down
+bool direcChange[4] = {0,0,0,0};
 
 // Jetson communication
 float setI[4] = {0,0,0,0}; // array of stored current setpoints
@@ -46,7 +47,7 @@ double outPI[4] = {0,0,0,0}; // array to store the outputs of the PI objects
 double setIPI[4] = {0,0,0,0}; // array of current setpoint values to be used by the PI objects
 float setV[4] = {0,0,0,0};
 int pwmOffset[4] = {0,0,0,0};
-int pwmCeiling = 120;
+int pwmCeiling = 180;
 
 // Encoders
 uint8_t quadEncoderFlag = 0;
@@ -66,9 +67,12 @@ uint8_t sdoPin[4] = {11, 13, 7, 9};
 uint8_t sckPin[4] = {10, 12, 6, 8};
 uint8_t csPin[4] = {25, 24, 27, 26};
 
+<<<<<<< HEAD
 // Frequency testing
 uint8_t frequency = 30;
 
+=======
+>>>>>>> a25d16ee89ddcf5d61b143fcb0a11baca46d7d28
 //------------------------------------------------------------------
 
 // Creation of absolute encoder objects; structure of arrays: {FR, FL, BR, BL}; indices: {0,1,2,3}
@@ -92,9 +96,11 @@ PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 //------------------------------------------------------------------
 
 void SetDirec(int wheel, bool dir) {
+  digitalWrite(mdIn1Pins[wheel], HIGH);
+  digitalWrite(mdIn2Pins[wheel], HIGH);
   if (dir == 1) {
-    digitalWrite(mdIn1Pins[wheel], LOW);
     digitalWrite(mdIn2Pins[wheel], HIGH);
+    digitalWrite(mdIn1Pins[wheel], LOW);
   } else if (dir == 0) {
     digitalWrite(mdIn1Pins[wheel], HIGH);
     digitalWrite(mdIn2Pins[wheel], LOW);
@@ -102,8 +108,8 @@ void SetDirec(int wheel, bool dir) {
 }
 
 void GetCurrent() {
-  // Changed for test was 4
-  for(int i=0;i<1;i++) {
+
+  for(int i=0;i<4;i++) {
     switch(i) {
       case 0:
         current[i] = float(ina260FR.readCurrent())/1000.0 - offset[i];
@@ -121,12 +127,12 @@ void GetCurrent() {
     
     current[i] = 1.0887*current[i];
 
-    if (current[i] < 0) {
-      direc[i] = 0;
+    // if (current[i] < 0) {
+    //   direc[i] = 0;
       
-    } else {
-      direc[i] = 1;
-    }
+    // } else {
+    //   direc[i] = 1;
+    // }
   }
   currentFlag = 1;
 }
@@ -199,14 +205,14 @@ void InitStuff() {
   ina260FL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260BR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
   ina260BL.setMode(INA260_MODE_CURRENT_CONTINUOUS);
-  ina260FR.setAveragingCount(INA260_COUNT_16);
-  ina260FL.setAveragingCount(INA260_COUNT_16);
-  ina260BR.setAveragingCount(INA260_COUNT_16);
-  ina260BL.setAveragingCount(INA260_COUNT_16);
-  ina260FR.setCurrentConversionTime(INA260_TIME_140_us);
-  ina260FL.setCurrentConversionTime(INA260_TIME_140_us);
-  ina260BR.setCurrentConversionTime(INA260_TIME_140_us);
-  ina260BL.setCurrentConversionTime(INA260_TIME_140_us);
+  // ina260FR.setAveragingCount(INA260_COUNT_16);
+  // ina260FL.setAveragingCount(INA260_COUNT_16);
+  // ina260BR.setAveragingCount(INA260_COUNT_16);
+  // ina260BL.setAveragingCount(INA260_COUNT_16);
+  ina260FR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260FL.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BR.setCurrentConversionTime(INA260_TIME_2_116_ms);
+  ina260BL.setCurrentConversionTime(INA260_TIME_2_116_ms);
 
   // Set PID mode, sampling time, and output limits
   piFR.SetMode(AUTOMATIC);
@@ -225,7 +231,7 @@ void InitStuff() {
 
 void CCUpdatePWM() {
   // Changed for test from 4
-  for(int i=0;i<1;i++) {
+  for(int i=0;i<4;i++) {
     setIPI[i] = setI[i];
     currentPI[i] = current[i];
     setV[i] = resistance[i] * setI[i];
@@ -233,11 +239,11 @@ void CCUpdatePWM() {
   }
 
   piFR.Compute();
-  // piFL.Compute();
-  // piBR.Compute();
-  // piBL.Compute();
+  piFL.Compute();
+  piBR.Compute();
+  piBL.Compute();
   // Changed for test was 4
-  for(int i=0;i<1;i++) {
+  for(int i=0;i<4;i++) {
     pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
     if(pwm[i] < 0) {
       pwm[i] = -pwm[i];
@@ -245,27 +251,93 @@ void CCUpdatePWM() {
     } else {
       desDirec[i] = 1;
     }
-    SetDirec(i,desDirec[i]);
+    if (direc[i] != desDirec[i]) {SetDirec(i,desDirec[i]); direc[i] = desDirec[i];}
+    // SetDirec(i,desDirec[i]);
     if (pwm[i] > pwmCeiling) {pwm[i] = pwmCeiling;} else if (pwm[i] < 0) {pwm[i] = 0;}
     analogWrite(mdEnPins[i], pwm[i]);
   }
 }
 
+// Frequency testing
+uint8_t frequency = 15;
 bool printToFile = false; 
-double last_time = 0; 
+double last_time = 0;
+int amplitude = 6;
+float phase[4] = {0,0.25,0.75,0.5};
+int mod;
 
 void ActuateAction() {
   // This function calls on independent functions to read the current and ...
   // ... compute the FF-PI controller to actuate a PWM accordingly.
   funcTime = micros();
+<<<<<<< HEAD
   setI[0] = 6 * sin(frequency * 2 * PI * millis() / 1000.0);
+=======
+
+  // mod = funcTime % int(2.0E6);
+  for(i=0;i<4;i++) {
+    setI[i] = amplitude * sin(0.75 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+    // if (mod > 1.6E6) {
+    //   setI[i] = amplitude;
+    // } else {
+    //   setI[i] = -amplitude;
+    // }
+  }
+
+>>>>>>> a25d16ee89ddcf5d61b143fcb0a11baca46d7d28
   GetCurrent();
   CCUpdatePWM();
   funcTime = micros() - funcTime;
   last_time = micros()/1.0E6;
-  printToFile = true; 
+  printToFile = true;
+}
 
+<<<<<<< HEAD
   // Update frequency every 5 seconds
+=======
+int timedInputCount = 0;
+int freqs[3] = {5, 0, 15};
+int amps[3] = {7, -9, 4};
+// int mod[4] = {0,0,0,0};
+
+void TimedInput() {
+  // frequency = 5 * timedInputCount;
+  // if (timedInputCount > 12) {timedInputCount = 0;}
+
+
+  // frequency = freqs[timedInputCount];
+  // amplitude = amps[timedInputCount];
+  // frequency = 15;
+  // amplitude = 5;
+  // timedInputCount++;
+  // if (timedInputCount > 2) {timedInputCount = 0;}
+
+  // mod = funcTime%
+
+  // for(i=0;i<4;i++) {
+  //   setI[i] = amplitude * sin(3 * 2.0 * PI * funcTime/1.0E6 + phase[i]*2*PI);
+  // }
+  
+
+  // frequency = 30;
+
+  // amplitude += 2;
+  // if (amplitude > 7) {amplitude = 5;}
+
+  for(i=0;i<2;i++) {
+    if (timedInputCount < 14) {
+      setI[i] = 0;
+    // } else if (timedInputCount < 17) {
+    //   setI[i] = -16;
+    // } else {
+    //   setI[i] = 10;
+    }
+  }
+
+
+  timedInputCount++;
+  if (timedInputCount>19) {timedInputCount = 0;}
+>>>>>>> a25d16ee89ddcf5d61b143fcb0a11baca46d7d28
 }
 
 
@@ -286,18 +358,18 @@ void setup() {
   // Initialize Timmer Interupts for 33Hz
   // Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
   // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(3000); // Timer for ActuateAction function
-  //Timer4.attachInterrupt(SineInput).start(10000); // Timer for sinusoidal input to actuators
+  Timer3.attachInterrupt(ActuateAction).start(5000); // Timer for ActuateAction function
+  // Timer4.attachInterrupt(TimedInput).start(100000); // Timer for input to actuators
 
 }
 
 double time_capture; 
-float current_capture; 
+float current_capture;
 void loop() {
 
   GetVoltage();
 
- analogWrite(mdEnPins[2], 60);
+  // analogWrite(mdEnPins[0], 60);
 
   // timeCount = millis();
 
@@ -356,21 +428,31 @@ void loop() {
   // Serial.println("");
   // currentFlag = 0;
 
+
   if(printToFile){
     time_capture = last_time;
-    current_capture = current[0];
+    current_capture = current[3];
 
-    Serial.print(time_capture, 3);
+    // Serial.print(time_capture, 3);
     // Serial.print(",");
     // Serial.print(setI[0], 6);
-    Serial.print(",");
+    // Serial.print(",");
     Serial.print(current_capture, 4);
     // Serial.print(",");
     // Serial.print(battVoltage, 2);
     Serial.print(",");
+<<<<<<< HEAD
     Serial.print(setI[0]);
+=======
+    Serial.print(battVoltage);
+    Serial.print(",");
+    Serial.print(funcTime);
+    Serial.print(",");
+    Serial.print(setI[3]);
+>>>>>>> a25d16ee89ddcf5d61b143fcb0a11baca46d7d28
     Serial.println();
     printToFile = false;
   }
+  // delay(10);
 }
 
