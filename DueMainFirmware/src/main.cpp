@@ -26,6 +26,7 @@
 #include "Adafruit_INA260.h"
 #include "PID_v1.h"
 #include "BNO08x.h"
+#include "SafetyStop.h"
 
 //------------------------------------------------------------------
 
@@ -342,9 +343,6 @@ void CCUpdatePWM() {
 
 void ActuateAction() {
   noInterrupts();
-  // This function calls on independent functions to read the current and ...
-  // ... compute the FF-I controller to actuate a PWM accordingly.
-  if (stopCondition == 0) {
      // This function calls on independent functions to read the current and ...
   // ... compute the FF-I controller to actuate a PWM accordingly.
   if (stopCondition == 0) {
@@ -355,7 +353,6 @@ void ActuateAction() {
     GetCurrent();
     CCUpdatePWM();
     funcTime = micros() - funcTime;
-  }
   }
   interrupts();
 }
@@ -420,11 +417,18 @@ void CheckStop() {
   } else {
     switchStatus = false;
   }
-  switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), (double*)&(absEncCurrentPosition[0]), switchStatus);
+  // switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), &absEncCurrentPosition[0], switchStatus);
+}
+
+
+void GetData() {
+  GetQuadEncoderData();
+  GetAbsEncoderData();
+  GetDataIMU();
+  GetSteeringAngle();
 }
 
 //------------------------------------------------------------------
-
 void setup() {
 
   InitStuff();
@@ -438,31 +442,28 @@ void setup() {
   for(int i=0;i<4;i++) {SetDirec(i,0);}
 
   // Initialize Timmer Interupts for 33Hz
-  Timer1.attachInterrupt(GetQuadEncoderData).start(30303); // Timer for Quad Encoder (33Hz)
-  Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(30303); // Timer for ActuateAction function
+  // You cannot use Timer0, Timer6, or Timer7 since they are linked to the PWM pins for the motor drivers 
+  Timer1.attachInterrupt(GetData).start(100000); // Timer for Quad Encoder (33Hz)
+  // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  Timer3.attachInterrupt(ActuateAction).start(5000); // Timer for ActuateAction function
   Timer5.attachInterrupt(CheckStop).start(500000);
-  Timer6.attachInterrupt(GetDataIMU).start(30303);
-  Timer7.attachInterrupt(GetSteeringAngle).start(30303);
+  // Timer6.attachInterrupt(GetDataIMU).start(30303);
+  // Timer7.attachInterrupt(GetSteeringAngle).start(30303);
 }
 
 void loop() {
   if (stopCondition == 0) {
     GetVoltage();
-
-    // timeCount = millis();
-
     if (Serial.available())
     {
       while(Serial.available())
       {
         Serial.read();
       }
+
       SendDataFunc();
     }
-
     delay(100);
-
   } else if (stopCondition == 300) {
     // do stuff
     for(i=0;i<4;i++) {
