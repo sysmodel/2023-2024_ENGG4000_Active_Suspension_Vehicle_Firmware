@@ -98,6 +98,7 @@ bool switchStatus = false;
 // Demo setpoints
 // Enums of the demos to run. 
 enum demoOptions{
+  Stop,
   Around,
   Bounce,
   Left2Right,
@@ -105,7 +106,7 @@ enum demoOptions{
 };
 
 // Select the demo to run
-demoOptions demo2run = Around;
+demoOptions demo2run = Stop;
 
 float jumpSetI[10] = {0,0,0,0,0,-10,-10,12};
 int jsi = 0;
@@ -138,7 +139,8 @@ PID piBR(&currentPI[2], &outPI[2], &setIPI[2], Kp, Ki, Kd, DIRECT);
 PID piBL(&currentPI[3], &outPI[3], &setIPI[3], Kp, Ki, Kd, DIRECT);
 
 // Create IMU object and corresponding global variables
-BNO08xIMU bno08x = BNO08xIMU();
+const uint8_t IMU_power_pin = 13;
+BNO08xIMU bno08x = BNO08xIMU(IMU_power_pin);
 sh2_SensorValue_t gyroValue;
 sh2_SensorValue_t linearAccelValue;
 sh2_SensorValue_t pitchAndRollValue;
@@ -157,9 +159,7 @@ int steeringAngle;
 unsigned int rawSteerData;
 unsigned int convertedSteeringData;
 
-//------------------------------------------------------------------
-
-
+bool IMU_found = false;
 
 //------------------------------------------------------------------
 void DemoSetpoints();
@@ -230,15 +230,18 @@ void GetAbsEncoderData() {
 
 void GetDataIMU()
 {
-  bno08x.GetDataIMU();
-  pitch = bno08x._ypr._pitch - bno08x._imuCAL._pitchOffset;
-  roll = bno08x._ypr._roll - bno08x._imuCAL._rollOffset;
-  yaw = bno08x._ypr._yaw - bno08x._imuCAL._yawOffsest;
-  gyroPitch = bno08x._rpRates._pitchRate;
-  gyroRoll = bno08x._rpRates._rollRate;
-  accelerationZ = bno08x._rpRates._zAcc;
+  if(IMU_found){
+    if(bno08x.GetDataIMU()){
+      pitch = bno08x._ypr._pitch - bno08x._imuCAL._pitchOffset;
+      roll = bno08x._ypr._roll - bno08x._imuCAL._rollOffset;
+      yaw = bno08x._ypr._yaw - bno08x._imuCAL._yawOffsest;
+      gyroPitch = bno08x._rpRates._pitchRate;
+      gyroRoll = bno08x._rpRates._rollRate;
+      accelerationZ = bno08x._rpRates._zAcc;
 
-  FlagIMU = 1;
+      FlagIMU = 1;
+    }
+  }
 }
 
 void GetSteeringAngle()
@@ -264,8 +267,12 @@ void InitStuff() {
   pinMode(battCell2Pin, INPUT); // pin of voltage sensor measuring battery cell #2
 
   // IMU Setup
-  bno08x.BeginBNO08x();
-  bno08x.SetReports();
+  if(bno08x.BeginBNO08x()){
+    bno08x.SetReports();
+    IMU_found = true;
+  }else{
+    Serial.println("IMU not found");
+  }
 
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
@@ -278,11 +285,11 @@ void InitStuff() {
   }
   if (!ina260BR.begin(0x45)) {
     Serial.println("Couldn't find INA260 chip (BR)");
-    // while (1);
+    while (1);
   }
   if (!ina260BL.begin(0x40)) {
     Serial.println("Couldn't find INA260 chip (BL)");
-    // while (1);
+    while (1);
   }
   
   ina260FR.setMode(INA260_MODE_CURRENT_CONTINUOUS);
@@ -329,6 +336,7 @@ void CCUpdatePWM() {
   piBL.Compute();
   for(int i=0;i<4;i++) {
     pwm[i] = pwmOffset[i] + int(outPI[i]); // FF + PI control
+    if(setI[i] == 0) {pwm[i] = 0;} // If the set current is 0, the motor should not move (pwm = 0
     if(pwm[i] < 0) {
       pwm[i] = -pwm[i];
       desDirec[i] = 0;
@@ -342,23 +350,16 @@ void CCUpdatePWM() {
 }
 
 void ActuateAction() {
-  noInterrupts();
      // This function calls on independent functions to read the current and ...
   // ... compute the FF-I controller to actuate a PWM accordingly.
   if (stopCondition == 0) {
-    funcTime = micros();
-
     DemoSetpoints();
-
     GetCurrent();
     CCUpdatePWM();
-    funcTime = micros() - funcTime;
   }
-  interrupts();
 }
 
 void DemoSetpoints() {
-
   switch(demo2run){
     case Around:
       for(i=0;i<4;i++) {
@@ -385,6 +386,12 @@ void DemoSetpoints() {
         setI[i] = amplitude * sin(frequency2 * 2.0 * PI * funcTime/1.0E6 + phaseF2B[i]*2*PI);
       }
       break;
+
+    default: // Stop
+      for(i=0;i<4;i++) {
+        setI[i] = 0;
+      }
+      break;
   }
 }
 
@@ -396,18 +403,20 @@ void SendDataFunc()
   Serial.print(absEncCurrentPosition[1],2);Serial.print(","); 
   Serial.print(absEncCurrentPosition[2],2);Serial.print(","); 
   Serial.print(absEncCurrentPosition[3],2);Serial.print(","); 
-  Serial.print(absEncCurrentVelocity[0],2);Serial.print(","); 
-  Serial.print(absEncCurrentVelocity[1],2);Serial.print(","); 
-  Serial.print(absEncCurrentVelocity[2],2);Serial.print(","); 
-  Serial.print(absEncCurrentVelocity[3],2);Serial.print(","); 
+  // Serial.print(absEncCurrentVelocity[0],2);Serial.print(","); 
+  // Serial.print(absEncCurrentVelocity[1],2);Serial.print(","); 
+  // Serial.print(absEncCurrentVelocity[2],2);Serial.print(","); 
+  // Serial.print(absEncCurrentVelocity[3],2);Serial.print(","); 
   Serial.print(quadEncoderVel,2);Serial.print(","); 
   Serial.print(pitch,2);Serial.print(","); 
   Serial.print(roll,2);Serial.print(","); 
   Serial.print(yaw,2);Serial.print(","); 
-  Serial.print(accelerationZ,2);Serial.print(","); 
-  Serial.print(gyroRoll,2);Serial.print(","); 
-  Serial.print(gyroPitch,2);Serial.print(","); 
-  Serial.print(steeringAngle);
+  // Serial.print(accelerationZ,2);Serial.print(","); 
+  // Serial.print(gyroRoll,2);Serial.print(","); 
+  // Serial.print(gyroPitch,2);Serial.print(","); 
+  Serial.print(steeringAngle);Serial.print(","); 
+  Serial.print(voltArray[0],2);Serial.print(",");
+  Serial.print(voltArray[1],2);
   Serial.println("}");
 }
 
@@ -417,19 +426,23 @@ void CheckStop() {
   } else {
     switchStatus = false;
   }
-  // switchStatus = CheckStopCondition(&(voltArray[0]), &(current[0]), &absEncCurrentPosition[0], switchStatus);
+  stopCondition = CheckStopCondition(voltArray, current); // , absEncCurrentPosition, switchStatus);
 }
 
 
 void GetData() {
-  GetQuadEncoderData();
-  GetAbsEncoderData();
-  GetDataIMU();
   GetSteeringAngle();
+  GetQuadEncoderData();
+  // noInterrupts();
+  // if(demo2run == Stop) {
+    GetDataIMU();
+  // }
+  // interrupts();
 }
 
 //------------------------------------------------------------------
 void setup() {
+
 
   InitStuff();
 
@@ -441,29 +454,52 @@ void setup() {
   for(int i=0;i<4;i++) {desDirec[i] = 0;}
   for(int i=0;i<4;i++) {SetDirec(i,0);}
 
+  // Calibrate the IMU, the first one takes a whole lot of time 
+  GetDataIMU();
+
   // Initialize Timmer Interupts for 33Hz
   // You cannot use Timer0, Timer6, or Timer7 since they are linked to the PWM pins for the motor drivers 
-  Timer1.attachInterrupt(GetData).start(100000); // Timer for Quad Encoder (33Hz)
-  // Timer2.attachInterrupt(GetAbsEncoderData).start(30303);  // Timer for Abs Encoder (33Hz)
+  // Timer1.attachInterrupt(GetQuadEncoderData).start(50000); // Timer for Quad Encoder (33Hz)
+  Timer2.attachInterrupt(GetAbsEncoderData).start(50000);  // Timer for Abs Encoder (33Hz)
   Timer3.attachInterrupt(ActuateAction).start(5000); // Timer for ActuateAction function
-  Timer5.attachInterrupt(CheckStop).start(500000);
-  // Timer6.attachInterrupt(GetDataIMU).start(30303);
-  // Timer7.attachInterrupt(GetSteeringAngle).start(30303);
+  // Timer5.attachInterrupt(CheckStop).start(500000);
+  // Timer8.attachInterrupt(GetDataIMU).start(50000);
+
 }
 
 void loop() {
+  funcTime = micros();
+  GetData();
+
   if (stopCondition == 0) {
     GetVoltage();
     if (Serial.available())
     {
       while(Serial.available())
       {
-        Serial.read();
+        byte input = Serial.read();
+        switch(input){
+          case 0x01:
+            demo2run = Around;
+            break;
+          case 0x02:
+            demo2run = Bounce;
+            break;
+          case 0x03:
+            demo2run = Left2Right;
+            break;
+          case 0x04:
+            demo2run = Front2Back;
+            break;
+
+          default:
+            demo2run = Stop;
+            break;
+        }
       }
 
       SendDataFunc();
     }
-    delay(100);
   } else if (stopCondition == 300) {
     // do stuff
     for(i=0;i<4;i++) {

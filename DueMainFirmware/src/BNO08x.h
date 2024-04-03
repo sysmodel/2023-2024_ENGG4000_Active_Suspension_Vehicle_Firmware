@@ -50,7 +50,7 @@ class BNO08xIMU
 {
   public:
     // Constructor 
-    BNO08xIMU();
+    BNO08xIMU(uint8_t pin);
 
     // StructureS
     euler_t _ypr;
@@ -61,7 +61,7 @@ class BNO08xIMU
     void SetReports();
 
     // Begin
-    void BeginBNO08x();
+    bool BeginBNO08x();
 
     // Math
     void QuaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees);
@@ -70,7 +70,7 @@ class BNO08xIMU
     void QuaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees);
 
     // GetAllData
-    void GetDataIMU();
+    bool GetDataIMU();
 
   private: 
     // Create object
@@ -85,6 +85,7 @@ class BNO08xIMU
     long _reportIntervalUs = 5000;
     uint16_t _calibrationCount = 250;
     uint16_t _calibrationFlag = 1;
+    uint8_t _pin;
     
 };
 
