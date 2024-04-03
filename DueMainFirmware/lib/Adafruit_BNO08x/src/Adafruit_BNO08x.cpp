@@ -111,7 +111,9 @@ bool Adafruit_BNO08x::begin_I2C(uint8_t i2c_address, TwoWire *wire,
   i2c_dev = new Adafruit_I2CDevice(i2c_address, wire);
 
   if (!i2c_dev->begin()) {
-    Serial.println(F("I2C address not found"));
+    if(Serial){
+      Serial.println(F("I2C address not found"));
+    }
     return false;
   }
 

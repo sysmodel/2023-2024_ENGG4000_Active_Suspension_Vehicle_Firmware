@@ -67,6 +67,7 @@ bool BNO08xIMU::BeginBNO08x()
   //   }
   // }
   // Serial.println("BNO08x Found!");
+
   Wire1.setClock(400000);
   if(!_bno08x->begin_I2C(BNO08x_I2CADDR_DEFAULT, &Wire1)){
     return false;
@@ -123,7 +124,7 @@ bool BNO08xIMU::GetDataIMU()
   
   // _calibrationFlag = 0;
   // }
-
+  
   return true;
 
 }

@@ -26,19 +26,17 @@
 #include "Adafruit_INA260.h"
 #include "PID_v1.h"
 #include "BNO08x.h"
-#include "SafetyStop.h"
+// #include "SafetyStop.h"
 
 //------------------------------------------------------------------
 
 #define led LED_BUILTIN
-#define battCell1Pin A0
-#define battCell2Pin A2
 
 //------------------------------------------------------------------
 
 #define led LED_BUILTIN
 #define steerPotPin A4
-#define battCell1Pin A3
+#define battCell1Pin A0
 #define battCell2Pin A2
 #define STOP_SWITCH_PIN_OUT 30
 #define STOP_SWITCH_PIN_IN 31
@@ -53,7 +51,7 @@ float voltArray[2] = {0,0};
 float battVoltage = 0;
 long timeCount = millis();
 int sineCount = 0;
-int funcTime = 0;
+unsigned long funcTime = 0;
 int currentFlag = 0;
 
 // Motor driver
@@ -106,15 +104,15 @@ enum demoOptions{
 };
 
 // Select the demo to run
-demoOptions demo2run = Stop;
+demoOptions demo2run = Around;
 
-float jumpSetI[10] = {0,0,0,0,0,-10,-10,12};
+float jumpSetI[10] = {0,0,0,0,0,-10,-10,-10, 12, 0};
 int jsi = 0;
 int amplitude = 6;
 float phase[4] = {0,0.25,0.75,0.5};
 float phaseL2R[4] = {0,0.5,0,0.5};
 float phaseF2B[4] = {0,0,0.5,0.5};
-int bounceTime;
+unsigned long bounceTime;
 float frequency = 0.75;
 float frequency2 = 1.25;
 
@@ -271,24 +269,34 @@ void InitStuff() {
     bno08x.SetReports();
     IMU_found = true;
   }else{
-    Serial.println("IMU not found");
+    if(Serial){
+      Serial.println("IMU not found");
+    }
   }
 
   // Begin current sensor reading and set averaging count
   if (!ina260FR.begin(0x41)) {
-    Serial.println("Couldn't find INA260 chip (FR)");
+    if(Serial){
+      Serial.println("Couldn't find INA260 chip (FR)");
+    }
     while (1);
   }
   if (!ina260FL.begin(0x44)) {
-    Serial.println("Couldn't find INA260 chip (FL)");
+    if(Serial){
+      Serial.println("Couldn't find INA260 chip (FL)");
+    }
     while (1);
   }
   if (!ina260BR.begin(0x45)) {
-    Serial.println("Couldn't find INA260 chip (BR)");
+    if(Serial){
+      Serial.println("Couldn't find INA260 chip (BR)");
+    }
     while (1);
   }
   if (!ina260BL.begin(0x40)) {
-    Serial.println("Couldn't find INA260 chip (BL)");
+    if(Serial){
+      Serial.println("Couldn't find INA260 chip (BL)");
+    }
     while (1);
   }
   
@@ -398,35 +406,32 @@ void DemoSetpoints() {
 
 void SendDataFunc()
 {
-  Serial.print("{");
-  Serial.print(absEncCurrentPosition[0],2);Serial.print(","); 
-  Serial.print(absEncCurrentPosition[1],2);Serial.print(","); 
-  Serial.print(absEncCurrentPosition[2],2);Serial.print(","); 
-  Serial.print(absEncCurrentPosition[3],2);Serial.print(","); 
-  // Serial.print(absEncCurrentVelocity[0],2);Serial.print(","); 
-  // Serial.print(absEncCurrentVelocity[1],2);Serial.print(","); 
-  // Serial.print(absEncCurrentVelocity[2],2);Serial.print(","); 
-  // Serial.print(absEncCurrentVelocity[3],2);Serial.print(","); 
-  Serial.print(quadEncoderVel,2);Serial.print(","); 
-  Serial.print(pitch,2);Serial.print(","); 
-  Serial.print(roll,2);Serial.print(","); 
-  Serial.print(yaw,2);Serial.print(","); 
-  // Serial.print(accelerationZ,2);Serial.print(","); 
-  // Serial.print(gyroRoll,2);Serial.print(","); 
-  // Serial.print(gyroPitch,2);Serial.print(","); 
-  Serial.print(steeringAngle);Serial.print(","); 
-  Serial.print(voltArray[0],2);Serial.print(",");
-  Serial.print(voltArray[1],2);
-  Serial.println("}");
+  if(Serial){
+    Serial.print("{");
+    Serial.print(absEncCurrentPosition[0],2);Serial.print(","); 
+    Serial.print(absEncCurrentPosition[1],2);Serial.print(","); 
+    Serial.print(absEncCurrentPosition[2],2);Serial.print(","); 
+    Serial.print(absEncCurrentPosition[3],2);Serial.print(","); 
+    // Serial.print(absEncCurrentVelocity[0],2);Serial.print(","); 
+    // Serial.print(absEncCurrentVelocity[1],2);Serial.print(","); 
+    // Serial.print(absEncCurrentVelocity[2],2);Serial.print(","); 
+    // Serial.print(absEncCurrentVelocity[3],2);Serial.print(","); 
+    Serial.print(quadEncoderVel,2);Serial.print(","); 
+    Serial.print(pitch,2);Serial.print(","); 
+    Serial.print(roll,2);Serial.print(","); 
+    Serial.print(yaw,2);Serial.print(","); 
+    // Serial.print(accelerationZ,2);Serial.print(","); 
+    // Serial.print(gyroRoll,2);Serial.print(","); 
+    // Serial.print(gyroPitch,2);Serial.print(","); 
+    Serial.print(steeringAngle);Serial.print(","); 
+    Serial.print(voltArray[0],2);Serial.print(",");
+    Serial.print(voltArray[1],2);
+    Serial.println("}");
+  }
 }
 
 void CheckStop() {
-  if (digitalRead(STOP_SWITCH_PIN_IN) == HIGH) {
-    switchStatus = true;
-  } else {
-    switchStatus = false;
-  }
-  stopCondition = CheckStopCondition(voltArray, current); // , absEncCurrentPosition, switchStatus);
+  // stopCondition = CheckStopCondition(voltArray, current); // , absEncCurrentPosition, switchStatus);
 }
 
 
@@ -461,21 +466,51 @@ void setup() {
   // You cannot use Timer0, Timer6, or Timer7 since they are linked to the PWM pins for the motor drivers 
   // Timer1.attachInterrupt(GetQuadEncoderData).start(50000); // Timer for Quad Encoder (33Hz)
   Timer2.attachInterrupt(GetAbsEncoderData).start(50000);  // Timer for Abs Encoder (33Hz)
-  Timer3.attachInterrupt(ActuateAction).start(5000); // Timer for ActuateAction function
-  // Timer5.attachInterrupt(CheckStop).start(500000);
+  Timer3.attachInterrupt(ActuateAction).start(10000); // Timer for ActuateAction function
+  // Timer1.attachInterrupt(CheckStop).start(50000);
   // Timer8.attachInterrupt(GetDataIMU).start(50000);
 
 }
 
+// Safety stop variables
+int stopCode = 0;
+float cellVoltLowLimit = 3.1; // in V, true low limit of battery is 3.2V/cell (6.4V)
+float currentHighLimit = 14; // arbitrary limit for high current
+uint8_t _j = 0; // variable for indexing
+
+// Stop condition codes
+float battVoltTooLow = 20;
+float currentTooHigh = 30;
+int _stopCode;
+
+bool LED_STATE = false;
+
 void loop() {
   funcTime = micros();
   GetData();
+  GetVoltage();
+  // CheckStop();
+
+  // Check battery cell limits
+  for(_j=0;_j<2;_j++) {
+      if (abs(voltArray[_j]) < cellVoltLowLimit) {
+        // Serial.print("Battery voltage too low. Code: ");
+        // Serial.println(voltArray[_j],2);
+        // stopCondition = 20 + int(_j);
+      }
+  }
+
+  // Check current limits
+  for(_j=0;_j<4;_j++) {
+      if (abs(current[_j]) > currentHighLimit) {
+        // stopCondition = 30 + int(_j);
+        }
+  }
 
   if (stopCondition == 0) {
-    GetVoltage();
-    if (Serial.available())
+    if (Serial.available() > 0)
     {
-      while(Serial.available())
+      while(Serial.available() > 0)
       {
         byte input = Serial.read();
         switch(input){
@@ -497,29 +532,35 @@ void loop() {
             break;
         }
       }
-
+      if(LED_STATE){
+        digitalWrite(LED_BUILTIN, LOW);
+        LED_STATE = false;
+      }else{
+        digitalWrite(LED_BUILTIN, HIGH);
+        LED_STATE = true;
+      }
       SendDataFunc();
+
     }
-  } else if (stopCondition == 300) {
-    // do stuff
-    for(i=0;i<4;i++) {
-      analogWrite(pwm[i],0);
-      SetDirec(i,0);
-    }
-    Serial.print("Manual stop condition. Code: ");
-    Serial.print(stopCondition);
-    Serial.println();
   } else {
     // do stuff
     for(i=0;i<4;i++) {
+      demo2run = Stop;
       analogWrite(pwm[i],0);
       SetDirec(i,0);
     }
-    Serial.print("Auto stop condition. Code: ");
-    Serial.print(stopCondition);
-    Serial.println();
+    if(Serial){
+      Serial.print("Auto stop condition. Code: ");
+      Serial.print(stopCondition);
+      Serial.println();
+    }
+    delay(1000);
+    noInterrupts();
     while(1);
+
     // If a limit is crossed, one should check the serial log.
     // The only way to get out of an auto stop is to restart the program.
   }
+
+
 }
