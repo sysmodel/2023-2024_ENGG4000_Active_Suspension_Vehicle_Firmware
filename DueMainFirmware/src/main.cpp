@@ -175,8 +175,7 @@ void setup() {
   // Wait until serial port is opened
   while (!Serial) {delay(1);}
 
-  // setI[4] = {-8.0,-8.0,1.0,1.0};
-  // for(int i=0;i<4;i++) {Serial.println(setI[i]);}
+  // Set initial direction DOWN
   for(int i=0;i<4;i++) {desDirec[i] = 0;}
   for(int i=0;i<4;i++) {SetDirec(i,0);}
 
@@ -219,7 +218,6 @@ void loop() {
     Serial.print(".");
     Serial.println();
     Serial.println("Stopped. Must restart.");
-    Serial.println(voltArray[0]);
 
     while(1);
     // If a limit is crossed, one should check the serial log.
