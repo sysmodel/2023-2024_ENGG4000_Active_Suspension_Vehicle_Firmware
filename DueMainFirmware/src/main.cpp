@@ -172,8 +172,8 @@ void setup() {
 
   InitStuff();
 
-  // Wait until serial port is opened
-  while (!Serial) {delay(1);}
+  // // Wait until serial port is opened
+  // while (!Serial) {delay(1);}
 
   // Set initial direction DOWN
   for(int i=0;i<4;i++) {desDirec[i] = 0;}
@@ -194,14 +194,14 @@ void loop() {
 
     // timeCount = millis();
 
-    if (Serial.available())
-    {
-      while(Serial.available())
-      {
-        Serial.read();
-      }
-      SendDataFunc();
-    }
+    // if (Serial.available())
+    // {
+    //   while(Serial.available())
+    //   {
+    //     Serial.read();
+    //   }
+    //   SendDataFunc();
+    // }
 
     delay(100);
 
